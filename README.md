@@ -56,6 +56,36 @@ dark-factory/
 
 ---
 
+## 🚀 Quickstart
+
+### 1. Local Setup
+```bash
+# Clone repository
+git clone https://github.com/novaecosystems-cloud/Pocketpay.git
+cd Pocketpay
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Launch FastAPI Server
+uvicorn src.api:app --reload --port 8000
+```
+Interactive Swagger docs will be available at `http://localhost:8000/docs`.
+
+### 2. Docker Setup
+```bash
+# Run API service
+docker compose up pocketpay-api
+
+# Run unit tests in container
+docker compose run --rm pocketpay-test
+
+# Run PhonePe Pulse chaos benchmark in container
+docker compose run --rm pocketpay-chaos
+```
+
+---
+
 ## 🧪 Verification & Chaos Fuzzing
 
 ### Run Unit Tests

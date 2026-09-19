@@ -1,0 +1,24 @@
+services:
+  pocketpay-api:
+    build: .
+    container_name: pocketpay-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+
+  pocketpay-test:
+    build: .
+    container_name: pocketpay-test
+    command: python -m unittest discover tests
+    profiles:
+      - test
+
+  pocketpay-chaos:
+    build: .
+    container_name: pocketpay-chaos
+    command: python chaos/phonepe_replay.py
+    profiles:
+      - chaos

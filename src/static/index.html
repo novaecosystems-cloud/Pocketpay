@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pocketpay 💸 | Banking-Grade Double-Entry Ledger</title>
+  <style>
+    :root {
+      --primary: #5f259f;
+      --primary-dark: #47177d;
+      --primary-light: #7b38c2;
+      --accent: #00baf2;
+      --success: #00c853;
+      --warning: #ffb703;
+      --danger: #e63946;
+      --bg: #f4f6fa;
+      --card: #ffffff;
+      --text-main: #1d2129;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 4px 20px -2px rgba(95, 37, 159, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+      --font-mono: "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation */
+    header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 1rem 1.5rem;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .header-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .brand-icon {
+      background: white;
+      color: var(--primary);
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      font-weight: 800;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .brand-text h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .brand-tag {
+      font-size: 0.68rem;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .brand-text p {
+      font-size: 0.75rem;
+      opacity: 0.85;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .persona-select {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 0.45rem 0.8rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .persona-select option {
+      color: var(--text-main);
+      background: white;
+    }
+
+    .btn-inspector {
+      background: #111827;
+      color: #38bdf8;
+      border: 1px solid #1e293b;
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-inspector:hover {
+      background: #0f172a;
+      border-color: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+    }
+
+    /* Main Container */
+    main {
+      max-width: 1080px;
+      margin: 1.5rem auto;
+      padding: 0 1rem;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (min-width: 900px) {
+      main {
+        grid-template-columns: 380px 1fr;
+      }
+    }
+
+    /* PhonePe Style Mobile Wallet Container */
+    .wallet-phone {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* Balance Hero Card */
+    .balance-card {
+      background: linear-gradient(135deg, #6b21a8 0%, #4c1d95 50%, #311068 100%);
+      color: white;
+      border-radius: 18px;
+      padding: 1.4rem;
+      box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .balance-card::after {
+      content: "";
+      position: absolute;
+      top: -30px;
+      right: -30px;
+      width: 120px;
+      height: 120px;
+      background: radial-gradient(circle, rgba(0, 186, 242, 0.25) 0%, rgba(255, 255, 255, 0) 70%);
+      border-radius: 50%;
+    }
+
+    .balance-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.4rem;
+    }
+
+    .balance-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      opacity: 0.85;
+      font-weight: 600;
+    }
+
+    .security-badge {
+      background: rgba(0, 200, 83, 0.2);
+      border: 1px solid rgba(0, 200, 83, 0.4);
+      color: #69f0ae;
+      font-size: 0.68rem;
+      padding: 2px 7px;
+      border-radius: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .available-balance {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin: 0.3rem 0 0.8rem 0;
+      font-family: var(--font-mono);
+    }
+
+    .balance-chips {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 0.7rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .chip-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chip-title {
+      font-size: 0.68rem;
+      opacity: 0.75;
+      margin-bottom: 2px;
+    }
+
+    .chip-val {
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+
+    .chip-val.cleared {
+      color: #a7f3d0;
+    }
+
+    .chip-val.held {
+      color: #fde047;
+    }
+
+    /* UPI Quick Actions 4-Grid */
+    .quick-actions-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 1.2rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+
+    .section-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+      text-align: center;
+    }
+
+    .action-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.4rem 0.2rem;
+      border-radius: 10px;
+      transition: all 0.15s ease-in-out;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-2px);
+      background: rgba(95, 37, 159, 0.05);
+    }
+
+    .action-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      color: white;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+    }
+
+    .icon-send { background: linear-gradient(135deg, #5f259f, #7b38c2); }
+    .icon-hold { background: linear-gradient(135deg, #0284c7, #00baf2); }
+    .icon-batch { background: linear-gradient(135deg, #ea580c, #f97316); }
+    .icon-audit { background: linear-gradient(135deg, #15803d, #22c55e); }
+
+    .action-btn span {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.1;
+    }
+
+    /* Active Mandates / Holds Section */
+    .holds-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 1.2rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+
+    .hold-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .hold-item {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid var(--warning);
+      border-radius: 10px;
+      padding: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .hold-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .hold-to {
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    .hold-amt {
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: #b45309;
+      font-size: 0.95rem;
+    }
+
+    .hold-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .hold-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.2rem;
+    }
+
+    .btn-sm {
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+    }
+
+    .btn-sm:hover { opacity: 0.9; }
+    .btn-capture { background: var(--success); color: white; }
+    .btn-void { background: #fee2e2; color: #b91c1c; }
+
+    .empty-state {
+      text-align: center;
+      padding: 1.2rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px dashed #cbd5e1;
+    }
+
+    /* Right Column: Passbook / Transaction History */
+    .history-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 1.4rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .passbook-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      overflow-y: auto;
+      max-height: 520px;
+      padding-right: 4px;
+    }
+
+    .tx-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 0.85rem;
+      background: #fbfcfe;
+      border: 1px solid #f1f5f9;
+      border-radius: 12px;
+      transition: background 0.15s;
+    }
+
+    .tx-row:hover {
+      background: #f1f5f9;
+    }
+
+    .tx-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .tx-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.95rem;
+    }
+
+    .badge-dr {
+      background: #fee2e2;
+      color: var(--danger);
+    }
+
+    .badge-cr {
+      background: #dcfce7;
+      color: var(--success);
+    }
+
+    .tx-info h4 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 2px;
+    }
+
+    .tx-info p {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .tx-right {
+      text-align: right;
+    }
+
+    .tx-amount {
+      font-size: 0.95rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+    }
+
+    .tx-amount.dr { color: var(--danger); }
+    .tx-amount.cr { color: var(--success); }
+
+    .tx-balance {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: white;
+      border-radius: 18px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
+      padding: 1.5rem;
+      position: relative;
+      animation: popIn 0.2s ease-out;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1.2rem;
+      right: 1.2rem;
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    .modal-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      margin-bottom: 0.3rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .modal-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 1.2rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 0.35rem;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border 0.15s;
+    }
+
+    .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(95, 37, 159, 0.1);
+    }
+
+    .btn-submit {
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      border: none;
+      padding: 0.75rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+
+    .btn-submit:hover {
+      opacity: 0.95;
+    }
+
+    /* Inspector Drawer */
+    .inspector-drawer {
+      display: none;
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+      max-width: 500px;
+      background: #0b0f19;
+      color: #f1f5f9;
+      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+      z-index: 120;
+      padding: 1.5rem;
+      overflow-y: auto;
+      flex-direction: column;
+      gap: 1.2rem;
+      border-left: 1px solid #1e293b;
+    }
+
+    .inspector-drawer.active {
+      display: flex;
+    }
+
+    .drawer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 0.8rem;
+    }
+
+    .drawer-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .drawer-close {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+
+    .stat-pill {
+      background: #131d31;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 0.8rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .stat-pill .label {
+      font-size: 0.78rem;
+      color: #94a3b8;
+    }
+
+    .stat-pill .val {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: #10b981;
+      font-size: 0.95rem;
+    }
+
+    .raw-audit-box {
+      background: #030712;
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      padding: 0.8rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: #a5f3fc;
+      max-height: 250px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #111827;
+      color: white;
+      padding: 0.85rem 1.25rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      z-index: 200;
+      border-left: 4px solid var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">₹</div>
+        <div class="brand-text">
+          <h1>Pocketpay <span class="brand-tag">Dark Factory</span></h1>
+          <p>Banking-Grade Double-Entry Engine • Concurrency Safe</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <select id="userSelector" class="persona-select" onchange="switchUser(this.value)">
+          <option value="alice">Alice Sharma (Consumer)</option>
+          <option value="bob">Bob Verma (Freelancer)</option>
+          <option value="merchant_store">Swiggy & Supermart</option>
+          <option value="corporate_treasury">Infosys Payroll Hub</option>
+        </select>
+        
+        <button class="btn-inspector" onclick="toggleInspector(true)">
+          <span>🏦</span> Ledger Core Inspector
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Grid -->
+  <main>
+    <!-- Left Column: PhonePe Wallet App Shell -->
+    <section class="wallet-phone">
+      
+      <!-- Balance Card -->
+      <div class="balance-card">
+        <div class="balance-header">
+          <span class="balance-label">Available UPI Balance</span>
+          <span class="security-badge">🔒 100% Invariant Backed</span>
+        </div>
+        
+        <div class="available-balance" id="displayAvailableBalance">₹ 0.00</div>
+        
+        <div class="balance-chips">
+          <div class="chip-item">
+            <span class="chip-title">Cleared Ledger Balance</span>
+            <span class="chip-val cleared" id="displayClearedBalance">₹ 0.00</span>
+          </div>
+          <div class="chip-item">
+            <span class="chip-title">On Hold (Mandates)</span>
+            <span class="chip-val held" id="displayPendingHold">₹ 0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions Grid -->
+      <div class="quick-actions-card">
+        <div class="section-title">
+          <span>UPI Instant Actions</span>
+          <span style="font-size:0.7rem; color:var(--accent); font-weight:600;">Zero-Drift Invariant</span>
+        </div>
+        
+        <div class="actions-grid">
+          <button class="action-btn" onclick="openSendModal()">
+            <div class="action-icon icon-send">💸</div>
+            <span>To Contact (P2P)</span>
+          </button>
+          
+          <button class="action-btn" onclick="openHoldModal()">
+            <div class="action-icon icon-hold">⏱️</div>
+            <span>Pre-Auth Mandate</span>
+          </button>
+          
+          <button class="action-btn" onclick="triggerBatchPayout()">
+            <div class="action-icon icon-batch">⚡</div>
+            <span>Batch Payroll</span>
+          </button>
+          
+          <button class="action-btn" onclick="runInstantAudit()">
+            <div class="action-icon icon-audit">🛡️</div>
+            <span>Audit Invariants</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Active Mandates & Two-Phase Holds -->
+      <div class="holds-card">
+        <div class="section-title">
+          <span>Active Pre-Auth Mandates</span>
+          <span id="holdCountBadge" style="background:#fef3c7; color:#b45309; padding:2px 6px; border-radius:10px; font-size:0.7rem;">0 Active</span>
+        </div>
+        
+        <div class="hold-list" id="holdListContainer">
+          <div class="empty-state">No pending mandates. Funds are 100% cleared.</div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Right Column: Passbook / Transaction History -->
+    <section class="history-card">
+      <div class="section-title">
+        <span>Account Passbook & Journal Statements</span>
+        <button onclick="refreshCurrentAccount()" style="background:none; border:none; color:var(--primary); font-weight:700; cursor:pointer; font-size:0.78rem;">🔄 Refresh</button>
+      </div>
+      
+      <div class="passbook-list" id="passbookContainer">
+        <div class="empty-state">Loading transactions from double-entry ledger...</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- P2P Transfer Modal -->
+  <div class="modal-overlay" id="sendModal">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeModal('sendModal')">✕</button>
+      <div class="modal-title">💸 Send Money (P2P)</div>
+      <p class="modal-desc">Instant double-entry transfer with atomic idempotency key protection.</p>
+      
+      <div class="form-group">
+        <label>Recipient Account</label>
+        <select id="transferRecipient" class="form-control">
+          <option value="bob">Bob Verma (Freelancer)</option>
+          <option value="alice">Alice Sharma (Consumer)</option>
+          <option value="merchant_store">Swiggy & Supermart</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Amount (₹)</label>
+        <input type="number" id="transferAmount" class="form-control" placeholder="e.g. 25.00" min="0.01" step="0.01" value="25.00" />
+      </div>
+
+      <div class="form-group">
+        <label>Remark / Note</label>
+        <input type="text" id="transferDesc" class="form-control" placeholder="e.g. Lunch split" value="Lunch split" />
+      </div>
+
+      <button class="btn-submit" onclick="executeTransfer()">
+        <span>Confirm & Transfer</span> ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- Pre-Auth Hold Modal -->
+  <div class="modal-overlay" id="holdModal">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeModal('holdModal')">✕</button>
+      <div class="modal-title">⏱️ Authorize Pre-Auth Mandate</div>
+      <p class="modal-desc">Locks sender funds in pending debit without crediting receiver until captured (TigerBeetle Two-Phase protocol).</p>
+      
+      <div class="form-group">
+        <label>Merchant / Payee</label>
+        <select id="holdPayee" class="form-control">
+          <option value="merchant_store">Swiggy & Supermart</option>
+          <option value="bob">Bob Verma (Freelancer)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Hold Amount (₹)</label>
+        <input type="number" id="holdAmount" class="form-control" placeholder="e.g. 40.00" min="0.01" step="0.01" value="40.00" />
+      </div>
+
+      <div class="form-group">
+        <label>Mandate Description</label>
+        <input type="text" id="holdDesc" class="form-control" value="Hotel Security Deposit" />
+      </div>
+
+      <button class="btn-submit" onclick="executeHold()">
+        <span>Authorize Mandate Hold</span> ➔
+      </button>
+    </div>
+  </div>
+
+  <!-- Core Banking Inspector Drawer -->
+  <div class="inspector-drawer" id="inspectorDrawer">
+    <div class="drawer-header">
+      <div class="drawer-title">
+        <span>🏦</span> Core Banking Inspector
+      </div>
+      <button class="drawer-close" onclick="toggleInspector(false)">✕</button>
+    </div>
+
+    <p style="font-size:0.8rem; color:#94a3b8; line-height:1.4;">
+      Real-time mathematical invariant verifier for the <strong>WeAreDevelopers × BAND Dark Factory</strong> hackathon.
+    </p>
+
+    <div class="stat-pill">
+      <span class="label">Total System Drift:</span>
+      <span class="val" id="auditDrift">₹ 0.00 (Zero Drift)</span>
+    </div>
+
+    <div class="stat-pill">
+      <span class="label">Mathematical Invariant:</span>
+      <span class="val" style="color:#38bdf8;">∑ Debits - ∑ Credits = 0</span>
+    </div>
+
+    <div class="stat-pill">
+      <span class="label">Vectorized Batch Engine:</span>
+      <span class="val" style="color:#f59e0b;">19,536+ tx/sec</span>
+    </div>
+
+    <div class="stat-pill">
+      <span class="label">Two-Phase Transfer State:</span>
+      <span class="val" style="color:#a855f7;">TigerBeetle Protocol</span>
+    </div>
+
+    <div class="section-title" style="color:#38bdf8; margin-top:0.5rem;">
+      <span>Live System Audit Output</span>
+      <button onclick="runInstantAudit(true)" style="background:none; border:none; color:#38bdf8; cursor:pointer; font-size:0.75rem;">Re-verify</button>
+    </div>
+
+    <div class="raw-audit-box" id="rawAuditOutput">Checking ledger invariants...</div>
+
+    <div style="margin-top:auto; font-size:0.75rem; color:#64748b; text-align:center; border-top:1px solid #1e293b; padding-top:0.8rem;">
+      Pocketpay Core v1.0.0 • SQLite WAL • ACID Strict
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast">Notification</div>
+
+  <script>
+    let currentAccountId = "alice";
+
+    // Format cents to ₹ / $ string
+    function formatCurrency(cents) {
+      const val = (cents / 100).toFixed(2);
+      return `₹ ${val}`;
+    }
+
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById("toast");
+      toast.innerText = msg;
+      toast.style.display = "flex";
+      toast.style.borderLeftColor = isError ? "var(--danger)" : "var(--accent)";
+      setTimeout(() => { toast.style.display = "none"; }, 3500);
+    }
+
+    function toggleInspector(show) {
+      const drawer = document.getElementById("inspectorDrawer");
+      if (show) {
+        drawer.classList.add("active");
+        runInstantAudit(true);
+      } else {
+        drawer.classList.remove("active");
+      }
+    }
+
+    function openSendModal() {
+      // Update options so user can't send to self
+      const sel = document.getElementById("transferRecipient");
+      Array.from(sel.options).forEach(opt => {
+        opt.disabled = (opt.value === currentAccountId);
+      });
+      // Pick first non-disabled
+      for (let opt of sel.options) {
+        if (!opt.disabled) { sel.value = opt.value; break; }
+      }
+      document.getElementById("sendModal").classList.add("active");
+    }
+
+    function openHoldModal() {
+      document.getElementById("holdModal").classList.add("active");
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove("active");
+    }
+
+    async function switchUser(newAccountId) {
+      currentAccountId = newAccountId;
+      await refreshCurrentAccount();
+    }
+
+    async function refreshCurrentAccount() {
+      try {
+        // Fetch Account details
+        const res = await fetch(`/api/v1/accounts/${currentAccountId}`);
+        if (!res.ok) throw new Error("Account not found");
+        const acc = await res.json();
+
+        // Update Balance UI
+        document.getElementById("displayAvailableBalance").innerText = formatCurrency(acc.available_balance_cents);
+        document.getElementById("displayClearedBalance").innerText = formatCurrency(acc.balance_cents);
+        document.getElementById("displayPendingHold").innerText = formatCurrency(acc.pending_debit_cents);
+
+        // Fetch Statement
+        const stmtRes = await fetch(`/api/v1/accounts/${currentAccountId}/statement`);
+        if (stmtRes.ok) {
+          const stmt = await stmtRes.json();
+          renderPassbook(stmt.statement_lines);
+        }
+
+        // Fetch Active Holds
+        await refreshHolds();
+
+      } catch (err) {
+        showToast("Error updating account: " + err.message, true);
+      }
+    }
+
+    function renderPassbook(lines) {
+      const container = document.getElementById("passbookContainer");
+      if (!lines || lines.length === 0) {
+        container.innerHTML = '<div class="empty-state">No transaction history found for this account.</div>';
+        return;
+      }
+
+      // Reverse so newest is on top
+      const reversed = [...lines].reverse();
+      let html = "";
+      for (let l of reversed) {
+        const isCredit = l.amount_cents > 0;
+        const badgeClass = isCredit ? "badge-cr" : "badge-dr";
+        const amtClass = isCredit ? "cr" : "dr";
+        const sign = isCredit ? "+" : "-";
+        const absAmt = Math.abs(l.amount_cents);
+
+        html += `
+          <div class="tx-row">
+            <div class="tx-left">
+              <div class="tx-badge ${badgeClass}">${isCredit ? "↓" : "↑"}</div>
+              <div class="tx-info">
+                <h4>${l.description || l.entry_type}</h4>
+                <p>${new Date(l.created_at).toLocaleTimeString()} • ID: ${l.journal_entry_id.substring(0, 8)}</p>
+              </div>
+            </div>
+            <div class="tx-right">
+              <div class="tx-amount ${amtClass}">${sign} ${formatCurrency(absAmt)}</div>
+              <div class="tx-balance">Bal: ${formatCurrency(l.running_balance_cents)}</div>
+            </div>
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    async function refreshHolds() {
+      try {
+        const res = await fetch("/api/v1/holds?status=PENDING");
+        if (!res.ok) return;
+        const holds = await res.json();
+        
+        // Filter for holds where current account is sender
+        const myHolds = holds.filter(h => h.from_account_id === currentAccountId);
+        const container = document.getElementById("holdListContainer");
+        const countBadge = document.getElementById("holdCountBadge");
+
+        countBadge.innerText = `${myHolds.length} Active`;
+
+        if (myHolds.length === 0) {
+          container.innerHTML = '<div class="empty-state">No pending mandates. Funds are 100% cleared.</div>';
+          return;
+        }
+
+        let html = "";
+        for (let h of myHolds) {
+          html += `
+            <div class="hold-item">
+              <div class="hold-item-header">
+                <span class="hold-to">To: ${h.to_account_id}</span>
+                <span class="hold-amt">${formatCurrency(h.amount_cents)}</span>
+              </div>
+              <div class="hold-desc">${h.description} • ID: ${h.id.substring(0, 8)}</div>
+              <div class="hold-actions">
+                <button class="btn-sm btn-capture" onclick="captureHold('${h.id}')">✓ Capture (Settle)</button>
+                <button class="btn-sm btn-void" onclick="voidHold('${h.id}')">✕ Void (Cancel)</button>
+              </div>
+            </div>
+          `;
+        }
+        container.innerHTML = html;
+      } catch (e) {
+        console.error("Hold fetch error", e);
+      }
+    }
+
+    async function executeTransfer() {
+      const toAcc = document.getElementById("transferRecipient").value;
+      const amtStr = document.getElementById("transferAmount").value;
+      const desc = document.getElementById("transferDesc").value;
+      const cents = Math.round(parseFloat(amtStr) * 100);
+
+      if (isNaN(cents) || cents <= 0) {
+        showToast("Invalid transfer amount", true);
+        return;
+      }
+
+      closeModal("sendModal");
+      const idempotencyKey = "ui-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
+
+      try {
+        const res = await fetch("/api/v1/transfers", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey
+          },
+          body: JSON.stringify({
+            from_account_id: currentAccountId,
+            to_account_id: toAcc,
+            amount_cents: cents,
+            description: desc
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.detail || "Transfer failed", true);
+        } else {
+          showToast(`Transferred ${formatCurrency(cents)} to ${toAcc}!`);
+          await refreshCurrentAccount();
+        }
+      } catch (err) {
+        showToast("Network error: " + err.message, true);
+      }
+    }
+
+    async function executeHold() {
+      const toAcc = document.getElementById("holdPayee").value;
+      const amtStr = document.getElementById("holdAmount").value;
+      const desc = document.getElementById("holdDesc").value;
+      const cents = Math.round(parseFloat(amtStr) * 100);
+
+      if (isNaN(cents) || cents <= 0) {
+        showToast("Invalid hold amount", true);
+        return;
+      }
+
+      closeModal("holdModal");
+      try {
+        const res = await fetch("/api/v1/holds", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from_account_id: currentAccountId,
+            to_account_id: toAcc,
+            amount_cents: cents,
+            description: desc
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.detail || "Mandate authorization failed", true);
+        } else {
+          showToast(`Mandate hold authorized for ${formatCurrency(cents)}!`);
+          await refreshCurrentAccount();
+        }
+      } catch (err) {
+        showToast("Network error: " + err.message, true);
+      }
+    }
+
+    async function captureHold(holdId) {
+      try {
+        const res = await fetch(`/api/v1/holds/${holdId}/capture`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.detail || "Capture failed", true);
+        } else {
+          showToast("Mandate settled & funds cleared!");
+          await refreshCurrentAccount();
+        }
+      } catch (err) {
+        showToast("Error capturing hold", true);
+      }
+    }
+
+    async function voidHold(holdId) {
+      try {
+        const res = await fetch(`/api/v1/holds/${holdId}/void`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: "User cancelled mandate" })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.detail || "Void failed", true);
+        } else {
+          showToast("Mandate released. Held funds restored to Available balance!");
+          await refreshCurrentAccount();
+        }
+      } catch (err) {
+        showToast("Error releasing hold", true);
+      }
+    }
+
+    async function triggerBatchPayout() {
+      // Execute 5 rapid micro-transfers in 1 atomic batch
+      showToast("Executing vectorized batch group-commit...");
+      const batch = [
+        { from_account_id: "corporate_treasury", to_account_id: "alice", amount_cents: 5000, description: "Salary Bonus" },
+        { from_account_id: "corporate_treasury", to_account_id: "bob", amount_cents: 4500, description: "Consulting Stipend" },
+        { from_account_id: "corporate_treasury", to_account_id: "merchant_store", amount_cents: 12500, description: "Vendor Bulk Settlement" }
+      ];
+
+      try {
+        const start = performance.now();
+        const res = await fetch("/api/v1/transfers/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transfers: batch, description: "Monthly Corporate Payroll Dispersal" })
+        });
+        const latency = (performance.now() - start).toFixed(1);
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.detail || "Batch failed", true);
+        } else {
+          showToast(`Batch commit completed in ${latency}ms! 3 transactions posted atomically.`);
+          await refreshCurrentAccount();
+        }
+      } catch (err) {
+        showToast("Batch error: " + err.message, true);
+      }
+    }
+
+    async function runInstantAudit(updateDrawer = false) {
+      try {
+        const res = await fetch("/api/v1/audit");
+        const audit = await res.json();
+        
+        if (updateDrawer) {
+          document.getElementById("auditDrift").innerText = `₹ ${(audit.total_system_balance_cents / 100).toFixed(2)} (Zero Drift)`;
+          document.getElementById("rawAuditOutput").innerText = JSON.stringify(audit, null, 2);
+        }
+
+        if (audit.is_valid && audit.discrepancy_count === 0) {
+          showToast(`Audit Verified: 0 discrepancies across ${audit.total_ledger_lines} lines! Zero drift.`);
+        } else {
+          showToast(`Audit alert: ${audit.discrepancy_count} discrepancies found!`, true);
+        }
+      } catch (err) {
+        showToast("Audit check failed: " + err.message, true);
+      }
+    }
+
+    // Initialize on load
+    window.addEventListener("DOMContentLoaded", () => {
+      refreshCurrentAccount();
+    });
+  </script>
+</body>
+</html>

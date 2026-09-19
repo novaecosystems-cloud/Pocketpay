@@ -4,8 +4,11 @@ Built with FastAPI to expose banking-grade double-entry wallet operations,
 idempotency key protection, and system-wide ledger audit checks.
 """
 
+import os
+from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, Header, HTTPException, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from src.service import PocketfulService
@@ -23,6 +26,24 @@ app = FastAPI(
 )
 
 service = PocketfulService()
+
+STATIC_DIR = Path(__file__).parent / "static"
+
+
+@app.on_event("startup")
+def on_startup():
+    """Seed baseline demo accounts for instant interactive UI testing."""
+    service.seed_demo_accounts()
+
+
+@app.get("/", response_class=HTMLResponse)
+def get_dashboard():
+    """Serves the PhonePe-styled FinTech interface and Ledger Operator Console."""
+    index_file = STATIC_DIR / "index.html"
+    if not index_file.exists():
+        return HTMLResponse("<h1>Pocketpay Engine Running</h1><p>UI loading...</p>", status_code=200)
+    return HTMLResponse(index_file.read_text(encoding="utf-8"), status_code=200)
+
 
 
 # Request / Response Schemas
@@ -78,6 +99,25 @@ def create_account(req: CreateAccountRequest):
         )
     except InvalidTransactionError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@app.get("/api/v1/accounts")
+def list_accounts():
+    accounts = service.list_accounts()
+    return [
+        {
+            "account_id": acc["id"],
+            "name": acc["name"],
+            "type": acc["type"],
+            "balance_cents": acc["balance_cents"],
+            "balance_formatted": f"${acc['balance_cents'] / 100:.2f}",
+            "pending_debit_cents": acc.get("pending_debit_cents", 0),
+            "available_balance_cents": acc["available_balance_cents"],
+            "available_balance_formatted": f"${acc['available_balance_cents'] / 100:.2f}",
+            "created_at": acc["created_at"],
+        }
+        for acc in accounts
+    ]
 
 
 @app.get("/api/v1/accounts/{account_id}")
@@ -152,6 +192,26 @@ def transfer_batch(req: BatchTransferRequest):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except InvalidTransactionError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@app.get("/api/v1/holds")
+def list_holds(status: Optional[str] = "PENDING"):
+    holds = service.list_pending_transfers(status=status)
+    return [
+        {
+            "id": h["id"],
+            "from_account_id": h["from_account_id"],
+            "to_account_id": h["to_account_id"],
+            "amount_cents": h["amount_cents"],
+            "amount_formatted": f"${h['amount_cents'] / 100:.2f}",
+            "timeout_seconds": h["timeout_seconds"],
+            "status": h["status"],
+            "description": h["description"],
+            "created_at": h["created_at"],
+            "completed_at": h.get("completed_at")
+        }
+        for h in holds
+    ]
 
 
 @app.post("/api/v1/holds", status_code=status.HTTP_201_CREATED)

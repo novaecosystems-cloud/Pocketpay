@@ -485,3 +485,67 @@ class PocketfulService:
             }
         finally:
             conn.close()
+
+    def list_accounts(self, conn: Optional[sqlite3.Connection] = None) -> List[Dict[str, Any]]:
+        """Lists all accounts with detailed balance breakdowns."""
+        c = conn if conn is not None else self._get_connection()
+        try:
+            rows = c.execute(
+                """
+                SELECT id, name, type, balance_cents, pending_debit_cents, pending_credit_cents, created_at
+                FROM accounts
+                ORDER BY CASE WHEN type = 'SYSTEM' THEN 1 ELSE 0 END, id ASC;
+                """
+            ).fetchall()
+            result = []
+            for r in rows:
+                item = dict(r)
+                item["available_balance_cents"] = item["balance_cents"] - item["pending_debit_cents"]
+                result.append(item)
+            return result
+        finally:
+            if conn is None:
+                c.close()
+
+    def list_pending_transfers(self, status: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> List[Dict[str, Any]]:
+        """Lists pending transfers, optionally filtered by status."""
+        c = conn if conn is not None else self._get_connection()
+        try:
+            if status:
+                rows = c.execute(
+                    """
+                    SELECT id, from_account_id, to_account_id, amount_cents, timeout_seconds, status, description, created_at, completed_at
+                    FROM pending_transfers
+                    WHERE status = ?
+                    ORDER BY created_at DESC;
+                    """,
+                    (status,)
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    """
+                    SELECT id, from_account_id, to_account_id, amount_cents, timeout_seconds, status, description, created_at, completed_at
+                    FROM pending_transfers
+                    ORDER BY created_at DESC;
+                    """
+                ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            if conn is None:
+                c.close()
+
+    def seed_demo_accounts(self) -> None:
+        """Seeds standard demo accounts for interactive fintech testing if absent."""
+        demos = [
+            ("alice", "Alice Sharma (Consumer)", 10000),         # $100.00
+            ("bob", "Bob Verma (Freelancer)", 5000),             # $50.00
+            ("merchant_store", "Swiggy & Supermart", 0),        # $0.00
+            ("corporate_treasury", "Infosys Payroll Hub", 500000), # $5,000.00
+        ]
+        for acc_id, name, init_cents in demos:
+            try:
+                self.create_account(acc_id, name, initial_balance_cents=init_cents)
+            except InvalidTransactionError:
+                # Account already exists, safe to continue
+                pass
+

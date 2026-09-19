@@ -99,6 +99,7 @@ class LedgerEngine:
         lines: List[LedgerLineInput],
         description: Optional[str] = None,
         idempotency_key: Optional[str] = None,
+        conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[str, Any]:
         """
         Executes an atomic double-entry transaction.
@@ -119,23 +120,24 @@ class LedgerEngine:
                 f"Double-entry balance violation: sum of lines is {total_sum} cents, must be 0."
             )
 
-        # Helper that does the actual work on a fresh connection
+        # Helper that does the actual work on a connection
         def _attempt():
-            conn = self._get_connection()
+            c = conn if conn is not None else self._get_connection()
             try:
                 return self._execute_on_conn(
-                    conn=conn,
+                    conn=c,
                     entry_type=entry_type,
                     lines=lines,
                     description=description,
                     idempotency_key=idempotency_key,
                 )
             finally:
-                conn.close()
+                if conn is None:
+                    c.close()
 
         # Handle idempotency polling if another concurrent thread is currently IN_FLIGHT
         if idempotency_key:
-            return self._execute_with_idempotency_coordination(_attempt, idempotency_key)
+            return self._execute_with_idempotency_coordination(_attempt, idempotency_key, conn=conn)
         else:
             return with_db_retry(_attempt)
 
@@ -144,6 +146,7 @@ class LedgerEngine:
         attempt_fn: Callable[[], Dict[str, Any]],
         idempotency_key: str,
         poll_timeout: float = 15.0,
+        conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[str, Any]:
         """
         Coordinates concurrent executions sharing the same idempotency key.
@@ -156,24 +159,28 @@ class LedgerEngine:
             except IdempotencyConflictError:
                 # Key is currently in-flight by another thread; wait and poll
                 time.sleep(0.02 + 0.03 * random.random())
-                cached = self._get_completed_idempotency(idempotency_key)
+                cached = self._get_completed_idempotency(idempotency_key, conn=conn)
                 if cached is not None:
                     return cached
                 continue
 
         # Timed out waiting for in-flight request
-        cached = self._get_completed_idempotency(idempotency_key)
+        cached = self._get_completed_idempotency(idempotency_key, conn=conn)
         if cached is not None:
             return cached
         raise IdempotencyConflictError(
             f"Timed out waiting for concurrent in-flight request with idempotency key: {idempotency_key}"
         )
 
-    def _get_completed_idempotency(self, idempotency_key: str) -> Optional[Dict[str, Any]]:
+    def _get_completed_idempotency(
+        self,
+        idempotency_key: str,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Optional[Dict[str, Any]]:
         """Checks if an idempotency key has completed and returns its response."""
-        conn = self._get_connection()
+        c = conn if conn is not None else self._get_connection()
         try:
-            row = conn.execute(
+            row = c.execute(
                 "SELECT status, response_json FROM idempotency_keys WHERE key = ?",
                 (idempotency_key,)
             ).fetchone()
@@ -184,7 +191,8 @@ class LedgerEngine:
                     raise LedgerError(f"Previous request with idempotency key '{idempotency_key}' failed.")
             return None
         finally:
-            conn.close()
+            if conn is None:
+                c.close()
 
     def _execute_on_conn(
         self,

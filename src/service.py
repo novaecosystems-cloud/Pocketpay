@@ -47,6 +47,7 @@ class PocketfulService:
         account_id: str,
         name: str,
         initial_balance_cents: int = 0,
+        conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[str, Any]:
         """
         Creates a new user wallet account.
@@ -62,23 +63,24 @@ class PocketfulService:
             raise InvalidTransactionError("Initial balance cannot be negative.")
 
         def _insert():
-            conn = self._get_connection()
+            c = conn if conn is not None else self._get_connection()
             try:
-                conn.execute("BEGIN IMMEDIATE;")
+                c.execute("BEGIN IMMEDIATE;")
                 now = utc_now_iso()
-                conn.execute(
+                c.execute(
                     """
                     INSERT INTO accounts (id, name, type, balance_cents, created_at)
                     VALUES (?, ?, 'USER', 0, ?);
                     """,
                     (account_id.strip(), name.strip(), now)
                 )
-                conn.execute("COMMIT;")
+                c.execute("COMMIT;")
             except sqlite3.IntegrityError as e:
-                conn.execute("ROLLBACK;")
+                c.execute("ROLLBACK;")
                 raise InvalidTransactionError(f"Account '{account_id}' already exists or violates constraint: {e}")
             finally:
-                conn.close()
+                if conn is None:
+                    c.close()
 
         with_db_retry(_insert)
 
@@ -87,15 +89,16 @@ class PocketfulService:
                 account_id=account_id,
                 amount_cents=initial_balance_cents,
                 description=f"Initial balance funding for {name}",
+                conn=conn,
             )
 
-        return self.get_account(account_id)
+        return self.get_account(account_id, conn=conn)
 
-    def get_account(self, account_id: str) -> Dict[str, Any]:
+    def get_account(self, account_id: str, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
         """Retrieves an account record by ID."""
-        conn = self._get_connection()
+        c = conn if conn is not None else self._get_connection()
         try:
-            row = conn.execute(
+            row = c.execute(
                 "SELECT id, name, type, balance_cents, created_at FROM accounts WHERE id = ?",
                 (account_id,)
             ).fetchone()
@@ -103,11 +106,12 @@ class PocketfulService:
                 raise AccountNotFoundError(f"Account '{account_id}' does not exist.")
             return dict(row)
         finally:
-            conn.close()
+            if conn is None:
+                c.close()
 
-    def get_balance(self, account_id: str) -> int:
+    def get_balance(self, account_id: str, conn: Optional[sqlite3.Connection] = None) -> int:
         """Returns the current balance in cents for an account."""
-        acc = self.get_account(account_id)
+        acc = self.get_account(account_id, conn=conn)
         return acc["balance_cents"]
 
     def deposit(
@@ -116,6 +120,7 @@ class PocketfulService:
         amount_cents: int,
         idempotency_key: Optional[str] = None,
         description: str = "Deposit",
+        conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[str, Any]:
         """
         Deposits money into an account from the system clearing pool.
@@ -138,6 +143,7 @@ class PocketfulService:
             lines=lines,
             description=description,
             idempotency_key=idempotency_key,
+            conn=conn,
         )
 
     def transfer(
@@ -147,6 +153,7 @@ class PocketfulService:
         amount_cents: int,
         idempotency_key: Optional[str] = None,
         description: str = "Transfer",
+        conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[str, Any]:
         """
         Transfers money between two accounts atomically.
@@ -171,6 +178,7 @@ class PocketfulService:
             lines=lines,
             description=description,
             idempotency_key=idempotency_key,
+            conn=conn,
         )
 
     def withdraw(
@@ -179,6 +187,7 @@ class PocketfulService:
         amount_cents: int,
         idempotency_key: Optional[str] = None,
         description: str = "Withdrawal",
+        conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[str, Any]:
         """
         Withdraws money from an account back to the system clearing pool.
@@ -196,6 +205,7 @@ class PocketfulService:
             lines=lines,
             description=description,
             idempotency_key=idempotency_key,
+            conn=conn,
         )
 
     def get_account_statement(self, account_id: str) -> Dict[str, Any]:

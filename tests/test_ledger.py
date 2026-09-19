@@ -17,15 +17,13 @@ import unittest
 
 from src.ledger_engine import (
     AccountNotFoundError,
-    IdempotencyConflictError,
     InsufficientFundsError,
     InvalidTransactionError,
-    LedgerEngine,
     LedgerError,
     LedgerLineInput,
     UnbalancedLedgerEntryError,
 )
-from src.models import SYSTEM_CLEARING_ACCOUNT_ID, get_connection, init_db
+from src.models import SYSTEM_CLEARING_ACCOUNT_ID, get_connection
 from src.service import PocketfulService
 
 

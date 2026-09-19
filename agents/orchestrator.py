@@ -7,14 +7,12 @@ Orchestrates the 4-agent Band for Pocketpay using Google Gemini:
 - Auditor: Reconciles all ledger entries, verifies conservation, issues Certificate.
 """
 
+import hashlib
 import json
 import os
 import ssl
 import sys
-import time
-import urllib.request
 from datetime import datetime, timezone
-import hashlib
 
 # Ensure dark-factory root is in sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

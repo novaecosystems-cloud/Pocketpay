@@ -100,6 +100,18 @@ class TestBatchEngine(unittest.TestCase):
         self.assertEqual(self.service.get_balance("ACC_B"), 5000)
         self.assertEqual(self.service.get_balance("ACC_C"), 2000)
 
+    def test_empty_batch_rejected(self):
+        """Verifies that an empty batch is rejected."""
+        with self.assertRaises(InvalidTransactionError):
+            self.service.transfer_batch([])
+
+    def test_transfer_to_self_in_batch_rejected(self):
+        """Verifies that transfer to same account in batch is rejected."""
+        with self.assertRaises(InvalidTransactionError):
+            self.service.transfer_batch([
+                {"from_account_id": "ACC_A", "to_account_id": "ACC_A", "amount_cents": 500}
+            ])
+
 
 if __name__ == "__main__":
     unittest.main()

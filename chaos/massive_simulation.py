@@ -23,26 +23,18 @@ Strict Invariant Verification at completion:
 """
 
 import os
-import sys
-import time
 import random
 import sqlite3
-from typing import Dict, List, Any, Tuple
+import sys
+import time
+from typing import Dict, List, Tuple
 
 # Ensure parent directory is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.models import (
-    init_db,
-    get_connection,
-    SYSTEM_CLEARING_ACCOUNT_ID,
-)
+from src.models import get_connection
 from src.service import PocketfulService
-from src.ledger_engine import (
-    InsufficientFundsError,
-    IdempotencyConflictError,
-    LedgerError,
-)
+from src.ledger_engine import InsufficientFundsError
 
 SIMULATION_DB_PATH = "data/simulation_100k.db"
 TOTAL_SIMULATIONS = 100_000

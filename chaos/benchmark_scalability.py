@@ -11,12 +11,11 @@ Demonstrates:
 import os
 import sys
 import time
-from typing import List, Dict, Any
 
 # Ensure parent directory is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.models import get_connection, init_db
+from src.models import get_connection
 from src.service import PocketfulService
 from src.paysim_loader import replay_paysim_stream
 

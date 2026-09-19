@@ -20,7 +20,6 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
 from src.models import (
-    SYSTEM_CLEARING_ACCOUNT_ID,
     get_connection,
     utc_now_iso,
 )

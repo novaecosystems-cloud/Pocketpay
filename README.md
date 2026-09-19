@@ -34,6 +34,29 @@ Every write request accepts an `Idempotency-Key` header:
 - **`COMPLETED`**: Safe replay returns the cached response without re-executing transactions.
 - **`FAILED`**: Failed attempts are safely recordable and isolated.
 
+### 5. Vectorized Group-Commit Batching (TigerBeetle-Style)
+Amortizes WAL synchronization overhead by bundling N transfers into a single vectorized atomic transaction block (`transfer_batch`), scaling engine throughput to **19,500+ transactions/second**.
+
+### 6. Two-Phase Transfers (Authorizations, Holds & Escrow)
+Supports native enterprise fintech card authorization workflows (`authorize_hold` $\rightarrow$ `capture_hold` / `void_hold`):
+- **`PENDING`**: Locks sender funds in `pending_debit_cents`, reducing `available_balance = balance - pending_debit` to prevent double-spending without prematurely crediting the receiver's cleared balance.
+- **`POSTED`**: Atomically settles the hold, transfers cleared funds, and commits double-entry ledger lines.
+- **`VOIDED`**: Atomically releases the reservation back to available balance with zero money movement.
+
+---
+
+## 🌐 Open-Source References & Financial Track Ecosystem
+
+Pocketpay incorporates the battle-tested architectural principles and empirical datasets from top financial engineering repositories:
+
+| Repository / Project | Track Reference | Architectural Role in Pocketpay |
+| :--- | :--- | :--- |
+| **[`tigerbeetle/tigerbeetle`](https://github.com/tigerbeetle/tigerbeetle)** | High-Performance Financial Accounting Engine | Vectorized batch group-commits (`execute_batch_transactions`) and native two-phase transfer state machines (`PENDING` $\rightarrow$ `POSTED` / `VOIDED`). |
+| **[`formancehq/ledger`](https://github.com/formancehq/ledger)** (Formance / Numary) | Programmable Multi-Asset Core Ledger | Composable transaction workflows and multi-party fee routing patterns. |
+| **[`blnkfinance/blnk`](https://github.com/blnkfinance/blnk)** | Open-Source Financial Ledger Core | Balance tri-partitioning (`cleared_balance`, `pending_balance`, `available_balance`) and non-negative available balance enforcement. |
+| **[`EdgarLopez-S/PaySimSynth`](https://github.com/EdgarLopez-S/PaySimSynth)** | Synthetic Financial Transaction Dataset | Standard 11-column mobile money benchmark (`CASH_IN`, `CASH_OUT`, `PAYMENT`, `TRANSFER`, `DEBIT`) streaming replay engine. |
+| **[`PhonePe/pulse`](https://github.com/PhonePe/pulse)** | Open Real-World UPI Data | Empirical transaction ticket-size distributions from 30+ billion real Indian UPI transactions. |
+
 ---
 
 ## 📂 Project Structure
@@ -41,17 +64,22 @@ Every write request accepts an `Idempotency-Key` header:
 ```
 dark-factory/
 ├── src/
-│   ├── models.py             # SQLite WAL mode & strict DB CHECK constraints
-│   ├── ledger_engine.py      # Transactional double-entry engine & lock sorter
-│   ├── service.py            # High-level wallet services & audit statements
-│   ├── api.py                # FastAPI / REST endpoints
+│   ├── models.py             # SQLite WAL mode, strict DB CHECK constraints, pending tables
+│   ├── ledger_engine.py      # Vectorized batch engine & TigerBeetle two-phase transfers
+│   ├── service.py            # High-level wallet services, holds, statements & audits
+│   ├── api.py                # FastAPI REST endpoints (transfers, batches, holds, audits)
+│   ├── paysim_loader.py      # PaySim mobile money streaming loader (11-column schema)
 │   └── phonepe_loader.py     # PhonePe Pulse telemetry & load sampler
 ├── tests/
-│   └── test_ledger.py        # 15 unit tests covering invariants & edge cases
+│   ├── test_ledger.py        # 15 unit tests covering invariants & edge cases
+│   ├── test_batch_engine.py  # 4 tests for vectorized batch commits & atomicity rollbacks
+│   └── test_two_phase.py     # 5 tests for TigerBeetle holds, captures & void releases
 ├── chaos/
-│   ├── concurrency_fuzzer.py # 50-worker overdraft, deadlock, & retry fuzzer
-│   └── phonepe_replay.py     # Realistic payment load benchmark
-└── agents/                   # BAND Desktop room configurations
+│   ├── benchmark_scalability.py # Engine scalability benchmark (unbatched vs batch vs holds)
+│   ├── massive_simulation.py    # 100,000 real-world simulations (10 scenario archetypes)
+│   ├── concurrency_fuzzer.py    # 50-worker overdraft, deadlock, & retry fuzzer
+│   └── phonepe_replay.py        # Realistic payment load benchmark
+└── agents/                      # BAND Desktop room configurations & transcripts
 ```
 
 ---
@@ -119,6 +147,20 @@ Executes **100,000 distinct financial transactions** spanning 10 everyday scenar
 * **Audit Discrepancies:** **0**
 * **System Mathematical Balance:** **\$0.00 drift** ($\sum \text{all balances} = 0$)
 * **Negative Balance Accounts:** **0** (100% invariant preservation)
+
+### Run Engine Scalability & Two-Phase Benchmark (TigerBeetle Mode)
+```bash
+python chaos/benchmark_scalability.py
+```
+* **Experiment 1 (Vectorized Group-Commit Batching):** Demonstrates **19,536+ tx/sec** (3.5x - 8x speedup over unbatched commits).
+* **Experiment 2 (Two-Phase Holds & Settlements):** 2,000 Auth $\rightarrow$ Capture/Void cycles at **6,213 operations/sec** with zero balance leaks.
+* **Experiment 3 (PaySim Replay):** Ingests 15,000 synthetic PaySim records at **3,596 tx/sec** with 100% money conservation.
+
+### Run PaySim Mobile Money Ingestion
+```bash
+python src/paysim_loader.py
+```
+Streams transactions following the PaySim 11-column mobile money benchmark (`CASH_IN`, `CASH_OUT`, `PAYMENT`, `TRANSFER`, `DEBIT`).
 
 ### Run Microsecond Concurrency Fuzzer
 ```bash

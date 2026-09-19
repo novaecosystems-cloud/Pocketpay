@@ -76,22 +76,34 @@ def init_db(db_path: Optional[str] = None) -> None:
         try:
             # 1. Accounts Table: CHECK (balance_cents >= 0 OR type = 'SYSTEM')
             # Ensures user accounts can never go negative at the database engine level.
+            # Includes pending_debit_cents and pending_credit_cents for TigerBeetle-style two-phase holds.
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS accounts (
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
                     type TEXT NOT NULL DEFAULT 'USER' CHECK (type IN ('USER', 'SYSTEM')),
                     balance_cents INTEGER NOT NULL DEFAULT 0,
+                    pending_debit_cents INTEGER NOT NULL DEFAULT 0,
+                    pending_credit_cents INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL,
-                    CHECK (balance_cents >= 0 OR type = 'SYSTEM')
+                    CHECK (balance_cents >= 0 OR type = 'SYSTEM'),
+                    CHECK (pending_debit_cents >= 0),
+                    CHECK (pending_credit_cents >= 0)
                 );
             """)
+
+            # Migrate existing accounts table if missing pending columns
+            existing_cols = [col[1] for col in conn.execute("PRAGMA table_info(accounts);").fetchall()]
+            if "pending_debit_cents" not in existing_cols:
+                conn.execute("ALTER TABLE accounts ADD COLUMN pending_debit_cents INTEGER NOT NULL DEFAULT 0;")
+            if "pending_credit_cents" not in existing_cols:
+                conn.execute("ALTER TABLE accounts ADD COLUMN pending_credit_cents INTEGER NOT NULL DEFAULT 0;")
 
             # 2. Journal Entries Table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS journal_entries (
                     id TEXT PRIMARY KEY,
-                    entry_type TEXT NOT NULL CHECK (entry_type IN ('DEPOSIT', 'TRANSFER', 'WITHDRAWAL', 'AUDIT_ADJUSTMENT')),
+                    entry_type TEXT NOT NULL CHECK (entry_type IN ('DEPOSIT', 'TRANSFER', 'WITHDRAWAL', 'AUDIT_ADJUSTMENT', 'BATCH_TRANSFER')),
                     description TEXT,
                     created_at TEXT NOT NULL
                 );
@@ -122,16 +134,37 @@ def init_db(db_path: Optional[str] = None) -> None:
                 );
             """)
 
+            # 5. TigerBeetle Two-Phase Pending Transfers Table
+            # Manages two-phase transfers: PENDING (hold) -> POSTED (settled) or VOIDED (canceled)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS pending_transfers (
+                    id TEXT PRIMARY KEY,
+                    from_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+                    to_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+                    amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+                    status TEXT NOT NULL CHECK (status IN ('PENDING', 'POSTED', 'VOIDED')),
+                    description TEXT,
+                    timeout_seconds INTEGER,
+                    created_at TEXT NOT NULL,
+                    expires_at TEXT,
+                    completed_at TEXT,
+                    journal_entry_id TEXT REFERENCES journal_entries(id) ON DELETE SET NULL
+                );
+            """)
+
             # Indexes for optimal query performance
             conn.execute("CREATE INDEX IF NOT EXISTS idx_ledger_lines_journal ON ledger_lines(journal_entry_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_ledger_lines_account ON ledger_lines(account_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(type);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_transfers_from ON pending_transfers(from_account_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_transfers_to ON pending_transfers(to_account_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_transfers_status ON pending_transfers(status);")
 
             # Seed system clearing account if not present
             conn.execute(
                 """
-                INSERT OR IGNORE INTO accounts (id, name, type, balance_cents, created_at)
-                VALUES (?, ?, 'SYSTEM', 0, ?);
+                INSERT OR IGNORE INTO accounts (id, name, type, balance_cents, pending_debit_cents, pending_credit_cents, created_at)
+                VALUES (?, ?, 'SYSTEM', 0, 0, 0, ?);
                 """,
                 (SYSTEM_CLEARING_ACCOUNT_ID, "System Clearing Reserve", utc_now_iso())
             )

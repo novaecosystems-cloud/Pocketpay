@@ -44,6 +44,30 @@ class TransferRequest(BaseModel):
     description: str = Field("P2P Transfer", example="Dinner split")
 
 
+class BatchTransferItem(BaseModel):
+    from_account_id: str
+    to_account_id: str
+    amount_cents: int = Field(..., gt=0)
+    description: Optional[str] = None
+
+
+class BatchTransferRequest(BaseModel):
+    transfers: list[BatchTransferItem]
+    description: Optional[str] = "Batch Vectorized Transfer"
+
+
+class CreateHoldRequest(BaseModel):
+    from_account_id: str = Field(..., example="alice")
+    to_account_id: str = Field(..., example="hotel_chain")
+    amount_cents: int = Field(..., gt=0, example=3500)
+    timeout_seconds: Optional[int] = Field(None, example=3600)
+    description: str = Field("Pre-auth hold", example="Hotel room deposit")
+
+
+class VoidHoldRequest(BaseModel):
+    reason: Optional[str] = Field("Reservation cancelled", example="Customer cancel")
+
+
 @app.post("/api/v1/accounts", status_code=status.HTTP_201_CREATED)
 def create_account(req: CreateAccountRequest):
     try:
@@ -60,12 +84,18 @@ def create_account(req: CreateAccountRequest):
 def get_account(account_id: str):
     try:
         acc = service.get_account(account_id)
+        balance = acc["balance_cents"]
+        pending = acc.get("pending_debit_cents", 0)
+        avail = balance - pending
         return {
             "account_id": acc["id"],
             "name": acc["name"],
             "type": acc["type"],
-            "balance_cents": acc["balance_cents"],
-            "balance_formatted": f"${acc['balance_cents'] / 100:.2f}",
+            "balance_cents": balance,
+            "balance_formatted": f"${balance / 100:.2f}",
+            "pending_debit_cents": pending,
+            "available_balance_cents": avail,
+            "available_balance_formatted": f"${avail / 100:.2f}",
             "created_at": acc["created_at"]
         }
     except AccountNotFoundError as e:
@@ -111,6 +141,54 @@ def transfer(req: TransferRequest, idempotency_key: Optional[str] = Header(None)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+@app.post("/api/v1/transfers/batch")
+def transfer_batch(req: BatchTransferRequest):
+    try:
+        dict_transfers = [t.model_dump() for t in req.transfers]
+        return service.transfer_batch(dict_transfers, description=req.description)
+    except AccountNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except InsufficientFundsError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except InvalidTransactionError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@app.post("/api/v1/holds", status_code=status.HTTP_201_CREATED)
+def create_hold(req: CreateHoldRequest):
+    try:
+        return service.authorize_hold(
+            from_account_id=req.from_account_id,
+            to_account_id=req.to_account_id,
+            amount_cents=req.amount_cents,
+            timeout_seconds=req.timeout_seconds,
+            description=req.description,
+        )
+    except AccountNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except InsufficientFundsError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except InvalidTransactionError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@app.post("/api/v1/holds/{hold_id}/capture")
+def capture_hold(hold_id: str):
+    try:
+        return service.capture_hold(hold_id)
+    except InvalidTransactionError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@app.post("/api/v1/holds/{hold_id}/void")
+def void_hold(hold_id: str, req: Optional[VoidHoldRequest] = None):
+    try:
+        reason = req.reason if req else None
+        return service.void_hold(hold_id, reason=reason)
+    except InvalidTransactionError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 @app.get("/api/v1/accounts/{account_id}/statement")
 def get_statement(account_id: str):
     try:
@@ -122,3 +200,4 @@ def get_statement(account_id: str):
 @app.get("/api/v1/audit")
 def run_audit():
     return service.run_full_ledger_audit()
+

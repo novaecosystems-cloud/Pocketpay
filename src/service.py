@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from src.ledger_engine import (
     AccountNotFoundError,
+    BatchTransferInput,
     InvalidTransactionError,
     LedgerEngine,
     LedgerLineInput,
@@ -69,8 +70,8 @@ class PocketfulService:
                 now = utc_now_iso()
                 c.execute(
                     """
-                    INSERT INTO accounts (id, name, type, balance_cents, created_at)
-                    VALUES (?, ?, 'USER', 0, ?);
+                    INSERT INTO accounts (id, name, type, balance_cents, pending_debit_cents, pending_credit_cents, created_at)
+                    VALUES (?, ?, 'USER', 0, 0, 0, ?);
                     """,
                     (account_id.strip(), name.strip(), now)
                 )
@@ -99,7 +100,7 @@ class PocketfulService:
         c = conn if conn is not None else self._get_connection()
         try:
             row = c.execute(
-                "SELECT id, name, type, balance_cents, created_at FROM accounts WHERE id = ?",
+                "SELECT id, name, type, balance_cents, pending_debit_cents, pending_credit_cents, created_at FROM accounts WHERE id = ?",
                 (account_id,)
             ).fetchone()
             if row is None:
@@ -208,6 +209,104 @@ class PocketfulService:
             conn=conn,
         )
 
+    def transfer_batch(
+        self,
+        transfers: List[Dict[str, Any]],
+        description: Optional[str] = None,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[str, Any]:
+        """
+        Executes a batch of transfers atomically using TigerBeetle vectorized commits.
+        
+        Each item in transfers must be a dict with:
+        - from_account_id: str
+        - to_account_id: str
+        - amount_cents: int
+        - description (optional): str
+        """
+        batch_inputs = [
+            BatchTransferInput(
+                from_account_id=t["from_account_id"],
+                to_account_id=t["to_account_id"],
+                amount_cents=t["amount_cents"],
+                description=t.get("description"),
+                idempotency_key=t.get("idempotency_key"),
+            )
+            for t in transfers
+        ]
+        return self.engine.execute_batch_transactions(
+            transfers=batch_inputs,
+            description=description,
+            conn=conn,
+        )
+
+    def get_available_balance(self, account_id: str, conn: Optional[sqlite3.Connection] = None) -> int:
+        """
+        Returns available balance (cleared balance minus active pending holds).
+        Available = balance_cents - pending_debit_cents.
+        """
+        acc = self.get_account(account_id, conn=conn)
+        return acc["balance_cents"] - acc["pending_debit_cents"]
+
+    def create_pending_transfer(
+        self,
+        from_account_id: str,
+        to_account_id: str,
+        amount_cents: int,
+        timeout_seconds: Optional[int] = None,
+        description: Optional[str] = None,
+        transfer_id: Optional[str] = None,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[str, Any]:
+        """
+        Phase 1 of TigerBeetle Two-Phase Transfer: Place a reservation hold on funds.
+        """
+        return self.engine.create_pending_transfer(
+            from_account_id=from_account_id,
+            to_account_id=to_account_id,
+            amount_cents=amount_cents,
+            timeout_seconds=timeout_seconds,
+            description=description,
+            transfer_id=transfer_id,
+            conn=conn,
+        )
+
+    # Aliases for card/fintech authorization terminology
+    authorize_hold = create_pending_transfer
+
+    def post_pending_transfer(
+        self,
+        pending_transfer_id: str,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[str, Any]:
+        """
+        Phase 2a of TigerBeetle Two-Phase Transfer: Settle/Capture held funds.
+        """
+        return self.engine.post_pending_transfer(pending_transfer_id, conn=conn)
+
+    capture_hold = post_pending_transfer
+
+    def void_pending_transfer(
+        self,
+        pending_transfer_id: str,
+        reason: Optional[str] = None,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[str, Any]:
+        """
+        Phase 2b of TigerBeetle Two-Phase Transfer: Cancel/Void reservation hold.
+        """
+        return self.engine.void_pending_transfer(pending_transfer_id, reason=reason, conn=conn)
+
+    void_hold = void_pending_transfer
+
+    def get_pending_transfer(
+        self,
+        pending_transfer_id: str,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Retrieves details of a pending transfer."""
+        return self.engine.get_pending_transfer(pending_transfer_id, conn=conn)
+
     def get_account_statement(self, account_id: str) -> Dict[str, Any]:
         """
         Returns full transaction history and statement for an account.
@@ -250,6 +349,8 @@ class PocketfulService:
                 "name": acc["name"],
                 "type": acc["type"],
                 "current_balance_cents": acc["balance_cents"],
+                "pending_debit_cents": acc.get("pending_debit_cents", 0),
+                "available_balance_cents": acc["balance_cents"] - acc.get("pending_debit_cents", 0),
                 "reconciled_balance_cents": running_balance,
                 "is_reconciled": (acc["balance_cents"] == running_balance),
                 "total_transactions": len(history),
@@ -265,7 +366,8 @@ class PocketfulService:
         2. Account Balance Reconciliation: Account balance == sum of ledger lines.
         3. Non-Negative Balance Invariant: No user account has balance < 0.
         4. Total System Money Conservation: Sum of all accounts == 0.
-        5. Foreign Key Integrity: No orphan ledger lines or entries.
+        5. Pending Hold Conservation: Sum(pending_debit) == Sum(pending_credit) == Sum(active PENDING transfers).
+        6. Available Balance Invariant: No user account has available balance (cleared - pending_debit) < 0.
         """
         conn = self._get_connection()
         try:
@@ -305,7 +407,7 @@ class PocketfulService:
 
             # 3. Non-negative user account balances
             negative_accounts = conn.execute("""
-                SELECT id, name, balance_cents
+                SELECT id, name, balance_cents, pending_debit_cents
                 FROM accounts
                 WHERE type = 'USER' AND balance_cents < 0;
             """).fetchall()
@@ -325,11 +427,49 @@ class PocketfulService:
                     f"System money conservation violation: sum of all accounts is {total_balance} cents, expected 0."
                 )
 
-            # 5. Summary statistics
+            # 5. Pending Hold Conservation: Sum(pending_debit) == Sum(pending_credit)
+            holds_row = conn.execute("""
+                SELECT 
+                    COALESCE(SUM(pending_debit_cents), 0) AS total_pending_debits,
+                    COALESCE(SUM(pending_credit_cents), 0) AS total_pending_credits
+                FROM accounts;
+            """).fetchone()
+            total_pending_debits = holds_row["total_pending_debits"] if holds_row else 0
+            total_pending_credits = holds_row["total_pending_credits"] if holds_row else 0
+            if total_pending_debits != total_pending_credits:
+                discrepancies.append(
+                    f"Pending holds mismatch: total pending debits={total_pending_debits} cents != total pending credits={total_pending_credits} cents."
+                )
+
+            # Check pending transfers sum
+            pend_sum_row = conn.execute("""
+                SELECT COALESCE(SUM(amount_cents), 0) AS pending_transfer_sum
+                FROM pending_transfers
+                WHERE status = 'PENDING';
+            """).fetchone()
+            pending_transfer_sum = pend_sum_row["pending_transfer_sum"] if pend_sum_row else 0
+            if total_pending_debits != pending_transfer_sum:
+                discrepancies.append(
+                    f"Pending transfers drift: account pending debits={total_pending_debits} cents != active pending transfers sum={pending_transfer_sum} cents."
+                )
+
+            # 6. Available balance invariant: balance_cents - pending_debit_cents >= 0
+            negative_avail = conn.execute("""
+                SELECT id, name, balance_cents, pending_debit_cents
+                FROM accounts
+                WHERE type = 'USER' AND (balance_cents - pending_debit_cents) < 0;
+            """).fetchall()
+            for row in negative_avail:
+                discrepancies.append(
+                    f"Illegal negative available balance on '{row['id']}': balance={row['balance_cents']}, pending_debits={row['pending_debit_cents']}."
+                )
+
+            # 7. Summary statistics
             account_count = conn.execute("SELECT COUNT(*) AS c FROM accounts;").fetchone()["c"]
             journal_count = conn.execute("SELECT COUNT(*) AS c FROM journal_entries;").fetchone()["c"]
             line_count = conn.execute("SELECT COUNT(*) AS c FROM ledger_lines;").fetchone()["c"]
             idempotency_count = conn.execute("SELECT COUNT(*) AS c FROM idempotency_keys;").fetchone()["c"]
+            pending_count = conn.execute("SELECT COUNT(*) AS c FROM pending_transfers WHERE status = 'PENDING';").fetchone()["c"]
 
             return {
                 "is_valid": (len(discrepancies) == 0),
@@ -337,6 +477,8 @@ class PocketfulService:
                 "total_journal_entries": journal_count,
                 "total_ledger_lines": line_count,
                 "total_idempotency_keys": idempotency_count,
+                "total_active_pending_transfers": pending_count,
+                "total_pending_held_cents": total_pending_debits,
                 "total_system_balance_cents": total_balance,
                 "discrepancy_count": len(discrepancies),
                 "discrepancies": discrepancies,

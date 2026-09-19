@@ -16,6 +16,7 @@ import sqlite3
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
 from src.models import (
@@ -59,6 +60,15 @@ class InvalidTransactionError(LedgerError):
 class LedgerLineInput:
     account_id: str
     amount_cents: int
+
+
+@dataclass(frozen=True)
+class BatchTransferInput:
+    from_account_id: str
+    to_account_id: str
+    amount_cents: int
+    description: Optional[str] = None
+    idempotency_key: Optional[str] = None
 
 
 def with_db_retry(
@@ -247,7 +257,7 @@ class LedgerEngine:
             account_rows: Dict[str, sqlite3.Row] = {}
             for acc_id in ordered_account_ids:
                 row = conn.execute(
-                    "SELECT id, name, type, balance_cents FROM accounts WHERE id = ?",
+                    "SELECT id, name, type, balance_cents, pending_debit_cents, pending_credit_cents FROM accounts WHERE id = ?",
                     (acc_id,)
                 ).fetchone()
                 if row is None:
@@ -256,15 +266,17 @@ class LedgerEngine:
                     raise AccountNotFoundError(f"Account '{acc_id}' does not exist.")
                 account_rows[acc_id] = row
 
-            # 4. Invariant Check: Verify non-negative balance for all USER accounts
+            # 4. Invariant Check: Verify non-negative available balance for all USER accounts
             for acc_id in ordered_account_ids:
                 acc = account_rows[acc_id]
                 net_change = net_by_account[acc_id]
                 new_balance = acc["balance_cents"] + net_change
-                if acc["type"] == "USER" and new_balance < 0:
+                pending_debits = acc["pending_debit_cents"] if "pending_debit_cents" in acc.keys() else 0
+                if acc["type"] == "USER" and (new_balance - pending_debits) < 0:
                     err_msg = (
                         f"Insufficient funds for account '{acc_id}' ({acc['name']}): "
-                        f"current balance = {acc['balance_cents']} cents, change = {net_change} cents."
+                        f"current balance = {acc['balance_cents']} cents, held = {pending_debits} cents, "
+                        f"available = {acc['balance_cents'] - pending_debits} cents, change = {net_change} cents."
                     )
                     self._fail_idempotency(conn, idempotency_key, err_msg)
                     conn.execute("COMMIT;")
@@ -358,3 +370,411 @@ class LedgerEngine:
                 """,
                 (err_json, utc_now_iso(), idempotency_key)
             )
+
+    def execute_batch_transactions(
+        self,
+        transfers: List[BatchTransferInput],
+        description: Optional[str] = None,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[str, Any]:
+        """
+        TigerBeetle-inspired Vectorized Group-Commit Batch Execution.
+        
+        Executes N transfers atomically within a single database transaction.
+        Enforces:
+        - Global deterministic account sorting to eliminate deadlocks across batch.
+        - Balance invariants: ensures available balance (balance - pending_debit) >= 0.
+        - Vectorized bulk updates for accounts and bulk inserts for journal & lines.
+        - All-or-nothing atomicity: if any transfer fails, entire batch rolls back.
+        """
+        if not transfers:
+            raise InvalidTransactionError("Batch must contain at least one transfer.")
+
+        def _attempt():
+            c = conn if conn is not None else self._get_connection()
+            try:
+                return self._execute_batch_on_conn(
+                    conn=c,
+                    transfers=transfers,
+                    description=description,
+                )
+            finally:
+                if conn is None:
+                    c.close()
+
+        return with_db_retry(_attempt)
+
+    def _execute_batch_on_conn(
+        self,
+        conn: sqlite3.Connection,
+        transfers: List[BatchTransferInput],
+        description: Optional[str],
+    ) -> Dict[str, Any]:
+        # Validate individual transfers
+        for t in transfers:
+            if t.from_account_id == t.to_account_id:
+                raise InvalidTransactionError(f"Cannot transfer to self in batch: {t.from_account_id}")
+            if t.amount_cents <= 0:
+                raise InvalidTransactionError(f"Transfer amount must be positive, got {t.amount_cents} cents.")
+
+        # Compute net changes per account
+        net_by_account: Dict[str, int] = {}
+        for t in transfers:
+            net_by_account[t.from_account_id] = net_by_account.get(t.from_account_id, 0) - t.amount_cents
+            net_by_account[t.to_account_id] = net_by_account.get(t.to_account_id, 0) + t.amount_cents
+
+        ordered_account_ids = sorted(net_by_account.keys())
+
+        conn.execute("BEGIN IMMEDIATE;")
+        try:
+            # Fetch all affected accounts in deterministic order
+            account_rows: Dict[str, sqlite3.Row] = {}
+            for acc_id in ordered_account_ids:
+                row = conn.execute(
+                    "SELECT id, name, type, balance_cents, pending_debit_cents FROM accounts WHERE id = ?",
+                    (acc_id,)
+                ).fetchone()
+                if row is None:
+                    raise AccountNotFoundError(f"Account '{acc_id}' in batch does not exist.")
+                account_rows[acc_id] = row
+
+            # Verify balance invariants across batch
+            for acc_id in ordered_account_ids:
+                acc = account_rows[acc_id]
+                net_change = net_by_account[acc_id]
+                new_balance = acc["balance_cents"] + net_change
+                # Available balance must remain >= 0
+                if acc["type"] == "USER" and (new_balance - acc["pending_debit_cents"]) < 0:
+                    raise InsufficientFundsError(
+                        f"Insufficient funds in batch for account '{acc_id}' ({acc['name']}): "
+                        f"balance = {acc['balance_cents']} cents, pending_debits = {acc['pending_debit_cents']} cents, "
+                        f"net change = {net_change} cents."
+                    )
+
+            # Apply vectorized balance updates
+            update_data = [(net_by_account[acc_id], acc_id) for acc_id in ordered_account_ids]
+            conn.executemany(
+                "UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?",
+                update_data
+            )
+
+            # Prepare vectorized journal entries & ledger lines
+            now_iso = utc_now_iso()
+            journal_records = []
+            ledger_records = []
+            receipts = []
+
+            for t in transfers:
+                entry_id = f"entry_{uuid.uuid4().hex}"
+                line1_id = f"line_{uuid.uuid4().hex}"
+                line2_id = f"line_{uuid.uuid4().hex}"
+                desc = t.description or description or "Batch Transfer"
+
+                journal_records.append((entry_id, "TRANSFER", desc, now_iso))
+                ledger_records.append((line1_id, entry_id, t.from_account_id, -t.amount_cents, now_iso))
+                ledger_records.append((line2_id, entry_id, t.to_account_id, t.amount_cents, now_iso))
+
+                receipts.append({
+                    "journal_entry_id": entry_id,
+                    "from_account_id": t.from_account_id,
+                    "to_account_id": t.to_account_id,
+                    "amount_cents": t.amount_cents,
+                    "status": "COMPLETED",
+                })
+
+            conn.executemany(
+                "INSERT INTO journal_entries (id, entry_type, description, created_at) VALUES (?, ?, ?, ?);",
+                journal_records
+            )
+            conn.executemany(
+                "INSERT INTO ledger_lines (id, journal_entry_id, account_id, amount_cents, created_at) VALUES (?, ?, ?, ?, ?);",
+                ledger_records
+            )
+
+            conn.execute("COMMIT;")
+
+            return {
+                "batch_size": len(transfers),
+                "total_cents": sum(t.amount_cents for t in transfers),
+                "receipts": receipts,
+                "status": "COMPLETED",
+            }
+        except Exception:
+            try:
+                conn.execute("ROLLBACK;")
+            except Exception:
+                pass
+            raise
+
+    def create_pending_transfer(
+        self,
+        from_account_id: str,
+        to_account_id: str,
+        amount_cents: int,
+        timeout_seconds: Optional[int] = None,
+        description: Optional[str] = None,
+        transfer_id: Optional[str] = None,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[str, Any]:
+        """
+        Phase 1 of TigerBeetle Two-Phase Transfer: PENDING (Authorization / Hold).
+        
+        Reserves funds on sender without crediting receiver's cleared balance yet.
+        Guarantees sender cannot double-spend reserved funds.
+        """
+        if from_account_id == to_account_id:
+            raise InvalidTransactionError("Cannot create pending transfer to the same account.")
+        if amount_cents <= 0:
+            raise InvalidTransactionError(f"Pending transfer amount must be positive, got {amount_cents} cents.")
+
+        def _attempt():
+            c = conn if conn is not None else self._get_connection()
+            try:
+                ordered_ids = sorted([from_account_id, to_account_id])
+                c.execute("BEGIN IMMEDIATE;")
+                try:
+                    account_rows: Dict[str, sqlite3.Row] = {}
+                    for acc_id in ordered_ids:
+                        row = c.execute(
+                            "SELECT id, name, type, balance_cents, pending_debit_cents, pending_credit_cents FROM accounts WHERE id = ?",
+                            (acc_id,)
+                        ).fetchone()
+                        if row is None:
+                            raise AccountNotFoundError(f"Account '{acc_id}' does not exist.")
+                        account_rows[acc_id] = row
+
+                    sender = account_rows[from_account_id]
+                    available = sender["balance_cents"] - sender["pending_debit_cents"]
+                    if sender["type"] == "USER" and available < amount_cents:
+                        raise InsufficientFundsError(
+                            f"Insufficient available funds for hold on '{from_account_id}': "
+                            f"balance = {sender['balance_cents']} cents, held = {sender['pending_debit_cents']} cents, "
+                            f"available = {available} cents, requested = {amount_cents} cents."
+                        )
+
+                    c.execute(
+                        "UPDATE accounts SET pending_debit_cents = pending_debit_cents + ? WHERE id = ?",
+                        (amount_cents, from_account_id)
+                    )
+                    c.execute(
+                        "UPDATE accounts SET pending_credit_cents = pending_credit_cents + ? WHERE id = ?",
+                        (amount_cents, to_account_id)
+                    )
+
+                    pend_id = transfer_id or f"pend_{uuid.uuid4().hex}"
+                    now_str = utc_now_iso()
+                    expires_str = None
+                    if timeout_seconds:
+                        expires_str = datetime.fromtimestamp(time.time() + timeout_seconds, timezone.utc).isoformat()
+
+                    c.execute(
+                        """
+                        INSERT INTO pending_transfers (id, from_account_id, to_account_id, amount_cents, status, description, timeout_seconds, created_at, expires_at)
+                        VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?, ?);
+                        """,
+                        (pend_id, from_account_id, to_account_id, amount_cents, description or "", timeout_seconds, now_str, expires_str)
+                    )
+
+                    c.execute("COMMIT;")
+
+                    return {
+                        "id": pend_id,
+                        "from_account_id": from_account_id,
+                        "to_account_id": to_account_id,
+                        "amount_cents": amount_cents,
+                        "status": "PENDING",
+                        "description": description or "",
+                        "timeout_seconds": timeout_seconds,
+                        "created_at": now_str,
+                        "expires_at": expires_str,
+                    }
+                except Exception:
+                    try:
+                        c.execute("ROLLBACK;")
+                    except Exception:
+                        pass
+                    raise
+            finally:
+                if conn is None:
+                    c.close()
+
+        return with_db_retry(_attempt)
+
+    def post_pending_transfer(
+        self,
+        pending_transfer_id: str,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[str, Any]:
+        """
+        Phase 2a of TigerBeetle Two-Phase Transfer: POST (Capture / Settle).
+        
+        Releases the hold and commits the double-entry transfer into cleared balances.
+        """
+        def _attempt():
+            c = conn if conn is not None else self._get_connection()
+            try:
+                c.execute("BEGIN IMMEDIATE;")
+                try:
+                    pend = c.execute(
+                        "SELECT * FROM pending_transfers WHERE id = ?",
+                        (pending_transfer_id,)
+                    ).fetchone()
+                    if pend is None:
+                        raise InvalidTransactionError(f"Pending transfer '{pending_transfer_id}' does not exist.")
+                    if pend["status"] != "PENDING":
+                        raise InvalidTransactionError(
+                            f"Cannot post transfer '{pending_transfer_id}' with status '{pend['status']}'."
+                        )
+
+                    from_acc = pend["from_account_id"]
+                    to_acc = pend["to_account_id"]
+                    amount = pend["amount_cents"]
+
+                    ordered_ids = sorted([from_acc, to_acc])
+                    for acc_id in ordered_ids:
+                        c.execute("SELECT id FROM accounts WHERE id = ?", (acc_id,))
+
+                    c.execute(
+                        "UPDATE accounts SET balance_cents = balance_cents - ?, pending_debit_cents = pending_debit_cents - ? WHERE id = ?",
+                        (amount, amount, from_acc)
+                    )
+                    c.execute(
+                        "UPDATE accounts SET balance_cents = balance_cents + ?, pending_credit_cents = pending_credit_cents - ? WHERE id = ?",
+                        (amount, amount, to_acc)
+                    )
+
+                    entry_id = f"entry_{uuid.uuid4().hex}"
+                    now_str = utc_now_iso()
+                    desc = f"Settlement of hold {pending_transfer_id}: {pend['description']}"
+
+                    c.execute(
+                        "INSERT INTO journal_entries (id, entry_type, description, created_at) VALUES (?, 'TRANSFER', ?, ?)",
+                        (entry_id, desc, now_str)
+                    )
+                    c.execute(
+                        "INSERT INTO ledger_lines (id, journal_entry_id, account_id, amount_cents, created_at) VALUES (?, ?, ?, ?, ?)",
+                        (f"line_{uuid.uuid4().hex}", entry_id, from_acc, -amount, now_str)
+                    )
+                    c.execute(
+                        "INSERT INTO ledger_lines (id, journal_entry_id, account_id, amount_cents, created_at) VALUES (?, ?, ?, ?, ?)",
+                        (f"line_{uuid.uuid4().hex}", entry_id, to_acc, amount, now_str)
+                    )
+
+                    c.execute(
+                        "UPDATE pending_transfers SET status = 'POSTED', completed_at = ?, journal_entry_id = ? WHERE id = ?",
+                        (now_str, entry_id, pending_transfer_id)
+                    )
+
+                    c.execute("COMMIT;")
+
+                    return {
+                        "id": pending_transfer_id,
+                        "journal_entry_id": entry_id,
+                        "from_account_id": from_acc,
+                        "to_account_id": to_acc,
+                        "amount_cents": amount,
+                        "status": "POSTED",
+                        "completed_at": now_str,
+                    }
+                except Exception:
+                    try:
+                        c.execute("ROLLBACK;")
+                    except Exception:
+                        pass
+                    raise
+            finally:
+                if conn is None:
+                    c.close()
+
+        return with_db_retry(_attempt)
+
+    def void_pending_transfer(
+        self,
+        pending_transfer_id: str,
+        reason: Optional[str] = None,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[str, Any]:
+        """
+        Phase 2b of TigerBeetle Two-Phase Transfer: VOID (Cancel / Release Hold).
+        
+        Releases reserved funds back to available balance without moving cleared money.
+        """
+        def _attempt():
+            c = conn if conn is not None else self._get_connection()
+            try:
+                c.execute("BEGIN IMMEDIATE;")
+                try:
+                    pend = c.execute(
+                        "SELECT * FROM pending_transfers WHERE id = ?",
+                        (pending_transfer_id,)
+                    ).fetchone()
+                    if pend is None:
+                        raise InvalidTransactionError(f"Pending transfer '{pending_transfer_id}' does not exist.")
+                    if pend["status"] != "PENDING":
+                        raise InvalidTransactionError(
+                            f"Cannot void transfer '{pending_transfer_id}' with status '{pend['status']}'."
+                        )
+
+                    from_acc = pend["from_account_id"]
+                    to_acc = pend["to_account_id"]
+                    amount = pend["amount_cents"]
+
+                    c.execute(
+                        "UPDATE accounts SET pending_debit_cents = pending_debit_cents - ? WHERE id = ?",
+                        (amount, from_acc)
+                    )
+                    c.execute(
+                        "UPDATE accounts SET pending_credit_cents = pending_credit_cents - ? WHERE id = ?",
+                        (amount, to_acc)
+                    )
+
+                    now_str = utc_now_iso()
+                    desc_update = pend["description"] or ""
+                    if reason:
+                        desc_update = f"{desc_update} [VOID REASON: {reason}]".strip()
+
+                    c.execute(
+                        "UPDATE pending_transfers SET status = 'VOIDED', completed_at = ?, description = ? WHERE id = ?",
+                        (now_str, desc_update, pending_transfer_id)
+                    )
+
+                    c.execute("COMMIT;")
+
+                    return {
+                        "id": pending_transfer_id,
+                        "from_account_id": from_acc,
+                        "to_account_id": to_acc,
+                        "amount_cents": amount,
+                        "status": "VOIDED",
+                        "completed_at": now_str,
+                        "reason": reason or "",
+                    }
+                except Exception:
+                    try:
+                        c.execute("ROLLBACK;")
+                    except Exception:
+                        pass
+                    raise
+            finally:
+                if conn is None:
+                    c.close()
+
+        return with_db_retry(_attempt)
+
+    def get_pending_transfer(
+        self,
+        pending_transfer_id: str,
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Retrieves a pending transfer by ID."""
+        c = conn if conn is not None else self._get_connection()
+        try:
+            row = c.execute(
+                "SELECT * FROM pending_transfers WHERE id = ?",
+                (pending_transfer_id,)
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            if conn is None:
+                c.close()
+

@@ -72,7 +72,7 @@ dark-factory/
 │   └── phonepe_loader.py     # PhonePe Pulse telemetry & load sampler
 ├── tests/
 │   ├── test_ledger.py        # 15 unit tests covering invariants & edge cases
-│   ├── test_batch_engine.py  # 4 tests for vectorized batch commits & atomicity rollbacks
+│   ├── test_batch_engine.py  # 6 tests for vectorized batch commits & atomicity rollbacks
 │   └── test_two_phase.py     # 5 tests for TigerBeetle holds, captures & void releases
 ├── chaos/
 │   ├── benchmark_scalability.py # Engine scalability benchmark (unbatched vs batch vs holds)
@@ -120,7 +120,7 @@ docker compose run --rm pocketpay-chaos
 ```bash
 python -m unittest discover tests
 ```
-*Result: 15 / 15 PASSED (100%)*
+*Result: 26 / 26 PASSED (100%)*
 
 ### Run Massive 100,000 Real-World Simulations
 ```bash

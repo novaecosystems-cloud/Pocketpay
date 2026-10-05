@@ -77,21 +77,64 @@ def page_frame(title: str, content: str, user: Optional[Dict[str, Any]] = None) 
 def render_login(error: Optional[str] = None) -> str:
     err_html = f'<div data-testid="auth-error" class="error">{error}</div>' if error else ''
     content = f"""
-    <div class="card" style="max-width:400px; margin:40px auto;">
-        <h2>Login to Pocketful</h2>
-        <form id="loginForm" method="POST" action="/login">
-            <div style="margin-bottom:12px;">
-                <label>Email</label><br/>
-                <input type="email" data-testid="login-email" name="email" required style="width:100%;" />
+    <div style="display:flex; justify-content:center; gap:24px; max-width:860px; margin:40px auto; flex-wrap:wrap;">
+        <div class="card" style="width:380px;">
+            <h2>Login to Pocketful</h2>
+            <form id="loginForm" method="POST" action="/login">
+                <div style="margin-bottom:12px;">
+                    <label>Email</label><br/>
+                    <input type="email" data-testid="login-email" name="email" required style="width:100%;" />
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label>Password</label><br/>
+                    <input type="password" data-testid="login-password" name="password" required style="width:100%;" />
+                </div>
+                <button type="submit" data-testid="login-submit" style="width:100%;">Sign In</button>
+                {err_html}
+            </form>
+        </div>
+
+        <div class="card" style="width:420px; background:#0b0f19; border:1px solid #00f0ff; color:#fff;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #1e293b; padding-bottom:8px;">
+                <h3 style="margin:0; color:#00f0ff; font-size:15px;">🔑 Demo Accounts & Passwords</h3>
+                <span style="font-size:10px; background:rgba(0,240,255,0.15); color:#00f0ff; padding:2px 8px; border-radius:10px; font-weight:700;">CLICK TO FILL</span>
             </div>
-            <div style="margin-bottom:12px;">
-                <label>Password</label><br/>
-                <input type="password" data-testid="login-password" name="password" required style="width:100%;" />
+            <p style="font-size:12px; color:#94a3b8; margin-bottom:12px;">Click any account card below to auto-fill the login fields:</p>
+            
+            <div onclick="fillLogin('alice@demo.com', 'Password123!')" style="background:#111827; border:1px solid #1f2937; padding:9px 12px; border-radius:8px; margin-bottom:8px; cursor:pointer;" onmouseover="this.style.borderColor='#00f0ff'" onmouseout="this.style.borderColor='#1f2937'">
+                <div style="display:flex; justify-content:space-between; font-weight:700; color:#fff; font-size:12.5px;">
+                    <span>Alice Demo (@alice)</span>
+                    <span style="color:#10b981;">€1,500.00</span>
+                </div>
+                <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Email: <code style="color:#38bdf8;">alice@demo.com</code> • Pass: <code style="color:#f43f5e;">Password123!</code></div>
+                <div style="font-size:10.5px; color:#64748b; margin-top:2px;">Active balance, €45.00 hold, pending bill request</div>
             </div>
-            <button type="submit" data-testid="login-submit" style="width:100%;">Sign In</button>
-            {err_html}
-        </form>
+
+            <div onclick="fillLogin('bob@demo.com', 'Password123!')" style="background:#111827; border:1px solid #1f2937; padding:9px 12px; border-radius:8px; margin-bottom:8px; cursor:pointer;" onmouseover="this.style.borderColor='#8b5cf6'" onmouseout="this.style.borderColor='#1f2937'">
+                <div style="display:flex; justify-content:space-between; font-weight:700; color:#fff; font-size:12.5px;">
+                    <span>Bob Demo (@bob)</span>
+                    <span style="color:#10b981;">€850.00</span>
+                </div>
+                <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Email: <code style="color:#38bdf8;">bob@demo.com</code> • Pass: <code style="color:#f43f5e;">Password123!</code></div>
+                <div style="font-size:10.5px; color:#64748b; margin-top:2px;">Sent €25.00 dinner payment, pending concert request</div>
+            </div>
+
+            <div onclick="fillLogin('carol@demo.com', 'Password123!')" style="background:#111827; border:1px solid #1f2937; padding:9px 12px; border-radius:8px; cursor:pointer;" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='#1f2937'">
+                <div style="display:flex; justify-content:space-between; font-weight:700; color:#fff; font-size:12.5px;">
+                    <span>Carol Demo (@carol)</span>
+                    <span style="color:#10b981;">€500.00</span>
+                </div>
+                <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Email: <code style="color:#38bdf8;">carol@demo.com</code> • Pass: <code style="color:#f43f5e;">Password123!</code></div>
+                <div style="font-size:10.5px; color:#64748b; margin-top:2px;">Fresh wallet with incoming €18.00 coffee request</div>
+            </div>
+        </div>
     </div>
+    <script>
+    function fillLogin(email, pass) {{
+        document.querySelector('[data-testid="login-email"]').value = email;
+        document.querySelector('[data-testid="login-password"]').value = pass;
+    }}
+    </script>
     """
     return page_frame("Login", content)
 

@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pocketpay — AI Dark Factory Pitch Deck (ElevenLabs Style)</title>
+    <style>
+        :root {
+            --bg-obsidian: #05070D;
+            --bg-card: #0B0F19;
+            --bg-card-hover: #111827;
+            --border-dim: #1E293B;
+            --cyan-glow: #00F0FF;
+            --purple-glow: #8B5CF6;
+            --emerald-glow: #10B981;
+            --rose-glow: #F43F5E;
+            --amber-glow: #F59E0B;
+            --text-main: #FFFFFF;
+            --text-sub: #94A3B8;
+            --text-muted: #64748B;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-obsidian);
+            color: var(--text-main);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* 16:9 Presentation Stage */
+        #deck-container {
+            position: relative;
+            width: 92vw;
+            max-width: 1400px;
+            aspect-ratio: 16 / 9;
+            background: radial-gradient(circle at 50% 0%, #111a33 0%, #05070D 70%);
+            border: 1px solid var(--border-dim);
+            border-radius: 16px;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 240, 255, 0.08);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 50px 70px;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            opacity: 0;
+            transition: opacity 0.35s ease-in-out;
+        }
+
+        .slide.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        /* Headers & Branding */
+        .slide-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 20px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .badge-cyan { background: rgba(0, 240, 255, 0.12); color: var(--cyan-glow); border: 1px solid rgba(0, 240, 255, 0.3); }
+        .badge-purple { background: rgba(139, 92, 246, 0.12); color: var(--purple-glow); border: 1px solid rgba(139, 92, 246, 0.3); }
+        .badge-emerald { background: rgba(16, 185, 129, 0.12); color: var(--emerald-glow); border: 1px solid rgba(16, 185, 129, 0.3); }
+
+        .slide-title {
+            font-size: 34px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: #FFFFFF;
+            line-height: 1.2;
+        }
+
+        .slide-subtitle {
+            font-size: 15px;
+            color: var(--text-sub);
+            margin-top: 6px;
+        }
+
+        .watermark {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        /* Content Area */
+        .slide-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            padding: 24px 0;
+        }
+
+        /* Grid Layouts */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            width: 100%;
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            width: 100%;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            width: 100%;
+        }
+
+        /* ElevenLabs Metric & Role Cards */
+        .card {
+            background: rgba(11, 15, 25, 0.85);
+            border: 1px solid var(--border-dim);
+            border-radius: 12px;
+            padding: 26px 24px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            backdrop-filter: blur(10px);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(0, 240, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .card-cyan { border-top: 3px solid var(--cyan-glow); }
+        .card-purple { border-top: 3px solid var(--purple-glow); }
+        .card-emerald { border-top: 3px solid var(--emerald-glow); }
+        .card-rose { border-top: 3px solid var(--rose-glow); }
+
+        .stat-huge {
+            font-size: 42px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 6px;
+        }
+
+        .stat-sub {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .card-p {
+            font-size: 13.5px;
+            line-height: 1.55;
+            color: var(--text-sub);
+        }
+
+        /* Footer & Navigation Controls */
+        .slide-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 16px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        #deck-controls {
+            position: fixed;
+            bottom: 20px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            background: rgba(11, 15, 25, 0.8);
+            padding: 8px 20px;
+            border-radius: 30px;
+            border: 1px solid var(--border-dim);
+            backdrop-filter: blur(12px);
+            z-index: 100;
+        }
+
+        .btn-nav {
+            background: #1E293B;
+            color: #FFFFFF;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-nav:hover {
+            background: #334155;
+        }
+
+        .progress-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #334155;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .progress-dot.active {
+            background: var(--cyan-glow);
+            transform: scale(1.3);
+            box-shadow: 0 0 8px var(--cyan-glow);
+        }
+
+        /* Specific Slide Styling */
+        .cover-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            width: 100%;
+        }
+
+        .cover-title {
+            font-size: 58px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            margin: 16px 0;
+            background: linear-gradient(135deg, #FFFFFF 30%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .cover-desc {
+            font-size: 20px;
+            color: var(--text-sub);
+            max-width: 800px;
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        .pill-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .pill {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-dim);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #E2E8F0;
+        }
+
+        /* Print styles */
+        @media print {
+            body { overflow: visible; height: auto; }
+            #deck-container { width: 100vw; max-width: none; border: none; box-shadow: none; }
+            .slide { position: relative; display: flex !important; opacity: 1 !important; page-break-after: always; height: 100vh; }
+            #deck-controls { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="deck-container">
+
+    <!-- SLIDE 1: COVER -->
+    <div class="slide active">
+        <div class="slide-header">
+            <div>
+                <span class="badge badge-cyan">AI Dark Factory • Hackathon Edition</span>
+            </div>
+            <div class="watermark">TRACK 2: POCKETFUL</div>
+        </div>
+        <div class="slide-body">
+            <div class="cover-content">
+                <div class="badge badge-purple" style="font-size: 13px; padding: 6px 18px;">BAND DESKTOP AUTONOMOUS FACTORY</div>
+                <h1 class="cover-title">POCKETPAY</h1>
+                <p class="cover-desc">
+                    A Sovereign, Bitemporal Double-Entry Financial Wallet Engineered by a 3-Seat Autonomous Coding Factory.
+                </p>
+                <div class="pill-group">
+                    <div class="pill">🏆 <strong>100% Score:</strong> 193 / 193 Checks Passed</div>
+                    <div class="pill">⚖️ <strong>Double-Entry Invariant:</strong> $\sum \Delta = 0$</div>
+                    <div class="pill">🤖 <strong>Band Factory:</strong> @architect • @implementer • @reviewer</div>
+                </div>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>WeAreDevelopers × BAND Hackathon 2026</span>
+            <span>github.com/novaecosystems-cloud/Pocketpay</span>
+        </div>
+    </div>
+
+    <!-- SLIDE 2: THE PROBLEM -->
+    <div class="slide">
+        <div class="slide-header">
+            <div>
+                <span class="badge badge-rose">The Industry Problem</span>
+                <h2 class="slide-title">Fragile Financial Ledgers Under Concurrency</h2>
+                <div class="slide-subtitle">Why traditional mobile wallets fail under real-world network packet loss and concurrent load</div>
+            </div>
+            <div class="watermark">02 / 10</div>
+        </div>
+        <div class="slide-body">
+            <div class="grid-3">
+                <div class="card card-rose">
+                    <div>
+                        <div class="stat-huge" style="color: var(--rose-glow);">17.4%</div>
+                        <div class="stat-sub">Floating-Point Drift</div>
+                    </div>
+                    <p class="card-p">
+                        Standard software uses floating-point decimals (`0.1 + 0.2 = 0.30000000000000004`). In high-frequency ledger bursts, tiny rounding errors compound into critical balance discrepancies and phantom money.
+                    </p>
+                </div>
+                <div class="card card-rose">
+                    <div>
+                        <div class="stat-huge" style="color: var(--rose-glow);">2x Double</div>
+                        <div class="stat-sub">Charges on Packet Loss</div>
+                    </div>
+                    <p class="card-p">
+                        Mobile networks drop packets during payment submission. Without strict idempotent write paths and distributed key hashing, user retries trigger double withdrawals and balance drain.
+                    </p>
+                </div>
+                <div class="card card-rose">
+                    <div>
+                        <div class="stat-huge" style="color: var(--rose-glow);">Destructive</div>
+                        <div class="stat-sub">Retroactive Overwrites</div>
+                    </div>
+                    <p class="card-p">
+                        Traditional databases mutate rows in place when corrections occur (`UPDATE balance`), destroying the audit trail and making it impossible to reconstruct historical balances as of a past timestamp.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>Pocketpay Architecture • Problem Statement</span>
+            <span>Zero Balance Invariant Violations Tolerated</span>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: THE SOLUTION -->
+    <div class="slide">
+        <div class="slide-header">
+            <div>
+                <span class="badge badge-cyan">The Pocketpay Solution</span>
+                <h2 class="slide-title">Mathematical Conservation Meets Bitemporality</h2>
+                <div class="slide-subtitle">Strict double-entry invariants backed by dual-timeline SQLite WAL ledger</div>
+            </div>
+            <div class="watermark">03 / 10</div>
+        </div>
+        <div class="slide-body">
+            <div class="grid-3">
+                <div class="card card-cyan">
+                    <div>
+                        <div class="stat-huge" style="color: var(--cyan-glow);">$\sum \Delta = 0$</div>
+                        <div class="stat-sub">Zero-Sum Ledger Conservation</div>
+                    </div>
+                    <p class="card-p">
+                        Every transfer strictly debits the sender and credits the receiver in atomic transactions. Enforced at the SQL engine level with `CHECK (balance >= 0)` to mathematically prevent negative balances.
+                    </p>
+                </div>
+                <div class="card card-cyan">
+                    <div>
+                        <div class="stat-huge" style="color: var(--cyan-glow);">Dual-Time</div>
+                        <div class="stat-sub">Bitemporal Revision Engine</div>
+                    </div>
+                    <p class="card-p">
+                        Separates <strong>Effective Time</strong> (`effective_at` / when funds actually moved) from <strong>Recorded Time</strong> (`recorded_at` / when the system learned of it), enabling audit-proof time-travel queries.
+                    </p>
+                </div>
+                <div class="card card-cyan">
+                    <div>
+                        <div class="stat-huge" style="color: var(--cyan-glow);">Zero Drift</div>
+                        <div class="stat-sub">Integer Minor Units & Idempotency</div>
+                    </div>
+                    <p class="card-p">
+                        All currency amounts stored as integer minor units (cents). 5-path distributed idempotency engine tracks canonical request hashes to guarantee safe retries under unreliable networks.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>Pocketpay Architecture • Core Principles</span>
+            <span>Deterministic Financial Integrity</span>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: THE AUTONOMOUS FACTORY -->
+    <div class="slide">
+        <div class="slide-header">
+            <div>
+                <span class="badge badge-purple">Factory Architecture</span>
+                <h2 class="slide-title">The 3-Seat Band Desktop Factory</h2>
+                <div class="slide-subtitle">Autonomous collaboration without human steering, certified via Band session logs</div>
+            </div>
+            <div class="watermark">04 / 10</div>
+        </div>
+        <div class="slide-body">
+            <div class="grid-3">
+                <div class="card card-purple">
+                    <div>
+                        <div class="stat-huge" style="color: var(--purple-glow);">@architect</div>
+                        <div class="stat-sub">Planning & Invariants</div>
+                    </div>
+                    <p class="card-p">
+                        <strong>Role:</strong> Lead Coordinator & Planner<br>
+                        <strong>Function:</strong> Deconstructs requirements into verifiable tasks, establishes database contracts, and enforces strict stage isolation to prevent overshooting.
+                    </p>
+                </div>
+                <div class="card card-purple">
+                    <div>
+                        <div class="stat-huge" style="color: var(--purple-glow);">@implementer</div>
+                        <div class="stat-sub">Systems Engineering</div>
+                    </div>
+                    <p class="card-p">
+                        <strong>Role:</strong> Backend Systems Engineer<br>
+                        <strong>Function:</strong> Develops containerized FastAPI services, implements SQLite WAL schemas, maintains Dockerfiles, and commits git revisions.
+                    </p>
+                </div>
+                <div class="card card-purple">
+                    <div>
+                        <div class="stat-huge" style="color: var(--purple-glow);">@reviewer</div>
+                        <div class="stat-sub">QA & Security Audit</div>
+                    </div>
+                    <p class="card-p">
+                        <strong>Role:</strong> Compliance & QA Auditor<br>
+                        <strong>Function:</strong> Executes test harness suites, validates vocabulary gates (Gate 4), stress-tests concurrency, and issues formal milestone certifications.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>Certified in room.json • Gate 1 & Gate 2 Compliant</span>
+            <span>Band Desktop Multi-Seat Execution</span>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: 4-STAGE PROGRESSIVE DELIVERY -->
+    <div class="slide">
+        <div class="slide-header">
+            <div>
+                <span class="badge badge-emerald">Progressive Delivery</span>
+                <h2 class="slide-title">Four Progressive Stages Without Overshoot</h2>
+                <div class="slide-subtitle">Strict stage isolation guaranteeing that earlier folders never bleed future features</div>
+            </div>
+            <div class="watermark">05 / 10</div>
+        </div>
+        <div class="slide-body">
+            <div class="grid-4">
+                <div class="card card-emerald">
+                    <div>
+                        <div class="stat-huge" style="color: var(--emerald-glow);">Stage 1</div>
+                        <div class="stat-sub">Core Ledger</div>
+                    </div>
+                    <p class="card-p">
+                        • $\sum \Delta = 0$ conservation<br>
+                        • SQLite WAL mode<br>
+                        • PBKDF2 authentication<br>
+                        • 5 write idempotency paths<br>
+                        <strong>147 / 147 Checks Passed</strong>
+                    </p>
+                </div>
+                <div class="card card-emerald">
+                    <div>
+                        <div class="stat-huge" style="color: var(--emerald-glow);">Stage 2</div>
+                        <div class="stat-sub">Holds & UI</div>
+                    </div>
+                    <p class="card-p">
+                        • Two-phase authorizations<br>
+                        • Dynamic balance holds<br>
+                        • SSR HTML web interface<br>
+                        • data-testid selectors<br>
+                        <strong>35 / 35 Checks Passed</strong>
+                    </p>
+                </div>
+                <div class="card card-emerald">
+                    <div>
+                        <div class="stat-huge" style="color: var(--emerald-glow);">Stage 3</div>
+                        <div class="stat-sub">Bitemporal Ledger</div>
+                    </div>
+                    <p class="card-p">
+                        • as_of & known_at queries<br>
+                        • [from, to) statements<br>
+                        • Snapshot token pagination<br>
+                        • Historical overdraft check<br>
+                        <strong>6 / 6 Checks Passed</strong>
+                    </p>
+                </div>
+                <div class="card card-emerald">
+                    <div>
+                        <div class="stat-huge" style="color: var(--emerald-glow);">Stage 4</div>
+                        <div class="stat-sub">Clearing & Refunds</div>
+                    </div>
+                    <p class="card-p">
+                        • Receiver-initiated refunds<br>
+                        • 32-item operator batches<br>
+                        • Settlement completeness<br>
+                        • Retroactive immutability<br>
+                        <strong>5 / 5 Checks Passed</strong>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>Score: 1.00 (Maximum Challenge Score)</span>
+            <span>Contiguous Stage: 4</span>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: VERIFICATION SCORECARD -->
+    <div class="slide">
+        <div class="slide-header">
+            <div>
+                <span class="badge badge-cyan">Evaluation Scorecard</span>
+                <h2 class="slide-title">100% Perfect Score Across 193 Checks</h2>
+                <div class="slide-subtitle">Flawless execution verified by the official hackathon grading harness</div>
+            </div>
+            <div class="watermark">06 / 10</div>
+        </div>
+        <div class="slide-body">
+            <div class="grid-4">
+                <div class="card card-cyan">
+                    <div>
+                        <div class="stat-huge" style="color: var(--cyan-glow);">193/193</div>
+                        <div class="stat-sub">Total Checks Passed</div>
+                    </div>
+                    <p class="card-p">
+                        100% pass rate across all four stage test suites. Zero skipped tests, zero timeouts, and zero assertion errors.
+                    </p>
+                </div>
+                <div class="card card-cyan">
+                    <div>
+                        <div class="stat-huge" style="color: var(--cyan-glow);">1.00</div>
+                        <div class="stat-sub">Highest Stage Score</div>
+                    </div>
+                    <p class="card-p">
+                        Highest contiguous stage achieved: 4. Unbroken chain of compliance from foundational transfers to net clearing.
+                    </p>
+                </div>
+                <div class="card card-cyan">
+                    <div>
+                        <div class="stat-huge" style="color: var(--cyan-glow);">0 Leaks</div>
+                        <div class="stat-sub">Gate 4 Compliance</div>
+                    </div>
+                    <p class="card-p">
+                        Mandates contain zero track vocabulary leaks. Verified via `harness check` dictionary audit.
+                    </p>
+                </div>
+                <div class="card card-cyan">
+                    <div>
+                        <div class="stat-huge" style="color: var(--cyan-glow);">Null</div>
+                        <div class="stat-sub">Stage Overshoot</div>
+                    </div>
+                    <p class="card-p">
+                        Gate 3 fully compliant. Earlier stage folders deliberately claim only their milestone without premature features.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>Official Run ID: fc604e6a326f499b814728938ab8a1fb</span>
+            <span>Clean Bill of Health</span>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: BITEMPORAL MOAT -->
+    <div class="slide">
+        <div class="slide-header">
+            <div>
+                <span class="badge badge-purple">Technical Moat</span>
+                <h2 class="slide-title">Dual-Timeline Bitemporal Accounting</h2>
+                <div class="slide-subtitle">Reconstructing the past with perfect fidelity while preventing retroactive overdrafts</div>
+            </div>
+            <div class="watermark">07 / 10</div>
+        </div>
+        <div class="slide-body">
+            <div class="grid-2">
+                <div class="card card-purple">
+                    <div class="stat-sub" style="color: var(--purple-glow);">Effective Time vs Recorded Time</div>
+                    <p class="card-p" style="font-size: 14.5px; line-height: 1.7;">
+                        • <strong>as_of (Effective Time):</strong> When the financial event took place in the real world.<br>
+                        • <strong>known_at (Recorded Time):</strong> When the system recorded or amended that transaction.<br>
+                        • <strong>Half-Open Intervals [from, to):</strong> Statements cover exact windows without boundary double-counting.<br>
+                        • <strong>Snapshot Pagination:</strong> Opaque tokens anchor client pagination to a frozen view of history, preventing phantom items during active scrolling.
+                    </p>
+                </div>
+                <div class="card card-purple">
+                    <div class="stat-sub" style="color: var(--purple-glow);">Historical Overdraft Protection Invariant</div>
+                    <p class="card-p" style="font-size: 14.5px; line-height: 1.7;">
+                        When an authorized operator retroactively amends or reverses a transaction from the past, the ledger evaluates the reconstructed balance at <em>every historical boundary point</em> between then and now.<br><br>
+                        If the account balance would have dropped below zero ($B(t) < 0$) at even a single millisecond in the past, the revision is rejected with HTTP 409 `historical_overdraft`.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>Financial Integrity Guarantee</span>
+            <span>Immutable Audit Trails</span>
+        </div>
+    </div>
+
+    <!-- SLIDE 8: PRODUCT & LIVE DEMO -->
+    <div class="slide">
+        <div class="slide-header">
+            <div>
+                <span class="badge badge-emerald">Live Product</span>
+                <h2 class="slide-title">Full-Featured Web App & Swagger API</h2>
+                <div class="slide-subtitle">Ready-to-use Venmo-style financial suite running locally on port 8000</div>
+            </div>
+            <div class="watermark">08 / 10</div>
+        </div>
+        <div class="slide-body">
+            <div class="grid-3">
+                <div class="card card-emerald">
+                    <div class="stat-sub" style="color: var(--emerald-glow);">Dashboard & Transfers</div>
+                    <p class="card-p">
+                        • Real-time wallet view: `Total`, `Available`, `Held`<br>
+                        • Instant P2P transfers by handle<br>
+                        • Activity timeline with notes & timestamps<br>
+                        • Seeded demo accounts (`alice`, `bob`, `carol`)
+                    </p>
+                </div>
+                <div class="card card-emerald">
+                    <div class="stat-sub" style="color: var(--emerald-glow);">Requests & Split Bills</div>
+                    <p class="card-p">
+                        • Peer-to-peer request workflow (Pay, Decline, Cancel)<br>
+                        • Multi-party split calculations with integer minor-unit rounding guarantees<br>
+                        • Interactive SSR forms with automated test IDs
+                    </p>
+                </div>
+                <div class="card card-emerald">
+                    <div class="stat-sub" style="color: var(--emerald-glow);">Authorizations & API Docs</div>
+                    <p class="card-p">
+                        • Two-phase merchant holds (`/authorizations`)<br>
+                        • Partial or full capture & void capabilities<br>
+                        • Interactive OpenAPI / Swagger UI at `/docs`<br>
+                        • Full test export / import state endpoints
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>Live Demo URL: http://127.0.0.1:8000</span>
+            <span>Login: alice@demo.com / Password123!</span>
+        </div>
+    </div>
+
+    <!-- SLIDE 9: MARKET OPPORTUNITY -->
+    <div class="slide">
+        <div class="slide-header">
+            <div>
+                <span class="badge badge-amber">Market Opportunity</span>
+                <h2 class="slide-title">Autonomous Agent & Embedded FinTech TAM</h2>
+                <div class="slide-subtitle">Where high-integrity bitemporal ledgers create massive enterprise value</div>
+            </div>
+            <div class="watermark">09 / 10</div>
+        </div>
+        <div class="slide-body">
+            <div class="grid-3">
+                <div class="card">
+                    <div>
+                        <div class="stat-huge" style="color: var(--amber-glow);">$54B</div>
+                        <div class="stat-sub">TAM: Embedded FinTech & Wallets</div>
+                    </div>
+                    <p class="card-p">
+                        SaaS platforms and marketplaces transitioning from pure software to embedded finance requiring high-concurrency wallet engines with zero reconciliation error.
+                    </p>
+                </div>
+                <div class="card">
+                    <div>
+                        <div class="stat-huge" style="color: var(--amber-glow);">$12B</div>
+                        <div class="stat-sub">SAM: Autonomous Agent Payments</div>
+                    </div>
+                    <p class="card-p">
+                        As AI agents begin executing purchases, subscriptions, and contractor payments autonomously, they require deterministic, two-phase authorization holds and strict idempotency.
+                    </p>
+                </div>
+                <div class="card">
+                    <div>
+                        <div class="stat-huge" style="color: var(--amber-glow);">$850M</div>
+                        <div class="stat-sub">SOM: Initial Developer Wedge</div>
+                    </div>
+                    <p class="card-p">
+                        White-label ledger core for gaming micro-economies, creator tipping networks, and peer-to-peer enterprise clearing groups.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>Bitemporal Ledger Market Sizing</span>
+            <span>Commercial Horizon</span>
+        </div>
+    </div>
+
+    <!-- SLIDE 10: CONCLUSION & THE ASK -->
+    <div class="slide">
+        <div class="slide-header">
+            <div>
+                <span class="badge badge-cyan">Summary & Delivery</span>
+                <h2 class="slide-title">Certified, Pushed & Competition Ready</h2>
+                <div class="slide-subtitle">Everything needed for the WeAreDevelopers × BAND AI Dark Factory Hackathon</div>
+            </div>
+            <div class="watermark">10 / 10</div>
+        </div>
+        <div class="slide-body">
+            <div class="grid-2">
+                <div class="card card-cyan">
+                    <div class="stat-sub" style="color: var(--cyan-glow);">Hackathon Deliverables Checklist</div>
+                    <p class="card-p" style="font-size: 14.5px; line-height: 1.8;">
+                        ✅ <strong>Public GitHub Repository:</strong> Live and clonable<br>
+                        ✅ <strong>Band Session Log (`room.json`):</strong> Downloaded & verified<br>
+                        ✅ <strong>Generic Mandates:</strong> `architect.md`, `implementer.md`, `reviewer.md`<br>
+                        ✅ <strong>4 Stage Folders:</strong> `stage-1/` through `stage-4/` buildable<br>
+                        ✅ <strong>Official Test Score:</strong> 193/193 Passed (100% Score: 1.00)<br>
+                        ✅ <strong>All 4 Gates Passed:</strong> Verified via `harness check`
+                    </p>
+                </div>
+                <div class="card card-purple">
+                    <div class="stat-sub" style="color: var(--purple-glow);">Repository & Project Access</div>
+                    <p class="card-p" style="font-size: 14.5px; line-height: 1.8;">
+                        • <strong>GitHub Repo:</strong><br>
+                        <a href="https://github.com/novaecosystems-cloud/Pocketpay" target="_blank" style="color: var(--cyan-glow); text-decoration: none; font-weight: 700;">github.com/novaecosystems-cloud/Pocketpay</a><br><br>
+                        • <strong>Local Demo Server:</strong><br>
+                        <a href="http://127.0.0.1:8000" target="_blank" style="color: var(--emerald-glow); text-decoration: none; font-weight: 700;">http://127.0.0.1:8000</a><br><br>
+                        • <strong>Interactive API Docs:</strong><br>
+                        <a href="http://127.0.0.1:8000/docs" target="_blank" style="color: var(--purple-glow); text-decoration: none; font-weight: 700;">http://127.0.0.1:8000/docs</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>AI Dark Factory Hackathon 2026</span>
+            <span>Pocketpay • Ready for Judging</span>
+        </div>
+    </div>
+
+</div>
+
+<!-- Interactive Navigation Controls -->
+<div id="deck-controls">
+    <button class="btn-nav" id="prev-btn" onclick="prevSlide()">← Prev</button>
+    <div id="dots-container" style="display:flex; gap:8px;"></div>
+    <button class="btn-nav" id="next-btn" onclick="nextSlide()">Next →</button>
+    <button class="btn-nav" onclick="toggleFullScreen()" style="margin-left:8px;">⛶ Fullscreen</button>
+    <button class="btn-nav" onclick="window.print()" style="background:#0F766E;">🖨️ PDF / Print</button>
+</div>
+
+<script>
+    const slides = document.querySelectorAll('.slide');
+    const dotsContainer = document.getElementById('dots-container');
+    let currentIndex = 0;
+
+    // Create pagination dots
+    slides.forEach((_, i) => {
+        const dot = document.createElement('div');
+        dot.className = `progress-dot ${i === 0 ? 'active' : ''}`;
+        dot.onclick = () => goToSlide(i);
+        dotsContainer.appendChild(dot);
+    });
+
+    const dots = document.querySelectorAll('.progress-dot');
+
+    function updateSlides() {
+        slides.forEach((s, i) => {
+            s.classList.toggle('active', i === currentIndex);
+        });
+        dots.forEach((d, i) => {
+            d.classList.toggle('active', i === currentIndex);
+        });
+    }
+
+    function nextSlide() {
+        if (currentIndex < slides.length - 1) {
+            currentIndex++;
+            updateSlides();
+        }
+    }
+
+    function prevSlide() {
+        if (currentIndex > 0) {
+            currentIndex--;
+            updateSlides();
+        }
+    }
+
+    function goToSlide(index) {
+        currentIndex = index;
+        updateSlides();
+    }
+
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+            nextSlide();
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+            prevSlide();
+        } else if (e.key.toLowerCase() === 'f') {
+            toggleFullScreen();
+        }
+    });
+</script>
+
+</body>
+</html>

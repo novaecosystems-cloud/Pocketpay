@@ -23,3 +23,5 @@ venv/
 # Testing & logs
 .pytest_cache/
 *.log
+
+.vercel

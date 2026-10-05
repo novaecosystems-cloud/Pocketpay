@@ -604,7 +604,7 @@ pfn.font.bold = True
 pfn.font.color.rgb = COLOR_CYAN
 pfn.space_before = Pt(6)
 
-add_footer(s8, "Live Demo Server: http://127.0.0.1:8000/login", "Auto-fill side box enabled • All Demo Passwords: Password123!")
+add_footer(s8, "Live Vercel Demo: https://temporary-turbo-carbon-owriola.vercel.app/login", "Auto-fill side box enabled • All Demo Passwords: Password123!")
 
 # -------------------------------------------------------------
 # SLIDE 9: MARKET OPPORTUNITY
@@ -720,7 +720,7 @@ p2.font.size = Pt(9.5)
 p2.font.bold = True
 p2.font.color.rgb = COLOR_WHITE
 p3 = tf.add_paragraph()
-p3.text = "• GitHub Submission Repository:\n  https://github.com/novaecosystems-cloud/Pocketpay\n\n• Live Local Demo Application: http://127.0.0.1:8000\n• Interactive OpenAPI Swagger: http://127.0.0.1:8000/docs\n• Team: Nova (@novaecosystems), @architect, @implementer, @reviewer\n\n🔑 Pre-Seeded Demo Logins (Password for all: Password123!):\n  - Alice (@alice): alice@demo.com (€1,500.00 / Primary demo)\n  - Bob (@bob): bob@demo.com (€850.00 / P2P recipient)\n  - Carol (@carol): carol@demo.com (€500.00 / Split requester)\n  *Sidebar click-to-fill active on login screen"
+p3.text = "• GitHub Submission Repository:\n  https://github.com/novaecosystems-cloud/Pocketpay\n\n• Live Vercel Deployment: https://temporary-turbo-carbon-owriola.vercel.app\n• Live Demo Login: https://temporary-turbo-carbon-owriola.vercel.app/login\n• Interactive OpenAPI Swagger: https://temporary-turbo-carbon-owriola.vercel.app/docs\n• Team: Nova (@novaecosystems), @architect, @implementer, @reviewer\n\n🔑 Pre-Seeded Demo Logins (Password for all: Password123!):\n  - Alice (@alice): alice@demo.com (€1,500.00 / Primary demo)\n  - Bob (@bob): bob@demo.com (€850.00 / P2P recipient)\n  - Carol (@carol): carol@demo.com (€500.00 / Split requester)\n  *Sidebar click-to-fill active on login screen"
 p3.font.size = Pt(11)
 p3.font.color.rgb = COLOR_SUB
 p3.space_before = Pt(8)
